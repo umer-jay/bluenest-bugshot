@@ -14,6 +14,9 @@
           <button type="button" class="tool-btn" data-tool="select" aria-pressed="true" title="Select — click here to stop drawing without picking another tool">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg>
           </button>
+          <button type="button" class="tool-btn" data-tool="move" title="Move — drag an existing annotation to reposition it">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+          </button>
           <button type="button" class="tool-btn" data-tool="text" title="Text">T</button>
           <button type="button" class="tool-btn" data-tool="arrow" title="Arrow">↗</button>
           <button type="button" class="tool-btn" data-tool="rect" title="Rectangle">▢</button>
@@ -28,13 +31,19 @@
           <button type="button" class="color-swatch" data-color="#ffffff" style="--swatch:#ffffff" title="White"></button>
         </div>
 
+        <div class="size-group" role="group" aria-label="Text size">
+          <button type="button" id="font-size-decrease" title="Smaller text">−</button>
+          <span id="font-size-display" aria-live="polite">16px</span>
+          <button type="button" id="font-size-increase" title="Larger text">+</button>
+        </div>
+
         <div class="action-group">
           <button type="button" id="undo-button" title="Undo (Ctrl/Cmd+Z)">Undo</button>
           <button type="button" id="clear-button" title="Clear all annotations">Clear</button>
         </div>
       </div>
 
-      <p class="hints">Shortcuts: Ctrl/Cmd+Z to undo · Enter to confirm text · Esc to cancel the current text box</p>
+      <p class="hints">Shortcuts: Ctrl/Cmd+Z to undo · Enter to confirm text · Esc to cancel the current text box or an in-progress move</p>
 
       <div class="canvas-wrap">
         <div class="canvas-stack" id="canvas-stack">

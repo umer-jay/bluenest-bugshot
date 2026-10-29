@@ -83,8 +83,11 @@ You only need to do this once per Notion workspace.
    normal web page (not a `chrome://` page or the Chrome Web Store — those can't be captured).
 2. Drag to select the area you want. Esc cancels; releasing confirms.
 3. A new tab opens with the cropped screenshot. Pick a tool — **Select** (pointer icon, pauses drawing),
-   **T** (text — click, type, Enter to confirm), **↗** (arrow), **▢** (rectangle) — and a color, then draw
-   on the image. Undo with the button or Ctrl/Cmd+Z; Clear wipes everything.
+   **Move** (drag an existing annotation to reposition it; Esc cancels mid-drag), **T** (text — click,
+   type, Enter to confirm), **↗** (arrow), **▢** (rectangle) — and a color, then draw on the image. Use
+   the **− / +** stepper to set the text size (10–48px) before placing a text annotation; it applies to
+   the next one you create, not to text already placed. Undo (button or Ctrl/Cmd+Z) reverts the last
+   change, whatever it was — adding a shape, moving one, or Clear; Clear wipes everything.
 4. Fill in a Title (required), Severity, and Notes.
 5. Click **Send**. It uploads the flattened screenshot and creates a card in your QA Pipeline database,
    then shows a link to open it. If you just want the image itself, **Copy Image** copies it to your
@@ -109,6 +112,10 @@ card) for errors. See `CLAUDE.md` for architecture and implementation notes.
 
 ## Changelog
 
+- **v1.1.0** — Added a Move tool: click and drag an existing annotation to reposition it (Esc cancels
+  an in-progress move). Rebuilt Undo as a proper history of snapshots instead of "remove the last
+  annotation," so it now correctly reverts a move (or a Clear) instead of deleting an unrelated shape.
+  Added a text size stepper (10–48px) instead of a fixed 16px.
 - **v1.0.1** — Real app icon (was a placeholder red square). Fixed the text annotation tool: its
   committed size/position on the image could drift noticeably from what you saw while typing, and white
   text was invisible while typing (input box background is now dark for light colors).

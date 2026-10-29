@@ -75,12 +75,33 @@ icon click / keyboard shortcut
   overlay's actual CSS size/position — `devicePixelRatio` only accounts for retina scaling, not the
   *additional* shrink from `max-width: 100%` on a capture wider than the container. `getCanvasScale()`
   (`canvas.width / boundingClientRect.width`) is the real canvas-px-per-CSS-px ratio at render time;
-  `TEXT_INPUT_FONT_SIZE_CSS`/`_INSET_X_CSS`/`_INSET_Y_CSS` must stay in sync with
-  `.annotation-text-input`'s actual font-size/border/padding in `editor.css` if either changes.
+  `TEXT_INPUT_INSET_X_CSS`/`_INSET_Y_CSS` must stay in sync with `.annotation-text-input`'s actual
+  border/padding in `editor.css` if either changes.
+- **Text size is adjustable (10–48px CSS, via `FONT_SIZE_MIN_CSS`/`_MAX_CSS`/`_STEP_CSS`), applied to
+  the *next* text annotation created — same "current setting" pattern as `currentColor`, not a per-shape
+  property editor.** `openTextInput` freezes `currentFontSizeCss` into a local `fontSizeAtOpen` at the
+  moment the input is created, and uses that same frozen value for both the input's own `font-size` and
+  the eventual committed annotation's `fontSize` — this is deliberate, so a user clicking the stepper
+  again while an input is still open can't make the committed text silently different from what they saw
+  while typing. `currentColor` doesn't have this same freeze and *can* drift in that scenario; don't
+  treat that as a precedent to copy if touching color next — fix it the same way instead.
 - **Annotations are data, not pixels, until export.** `editor.js` keeps a plain array of annotation
   objects (`{type, ...}`) redrawn in full on every change (`redraw()`), rather than drawing
-  incrementally onto a persistent layer — this is what makes undo a simple array `pop()`. Add new tools
-  by adding a case to `drawAnnotation`/`buildShapeDraft`, not by drawing directly in the pointer handlers.
+  incrementally onto a persistent layer. Add new tools by adding a case to
+  `drawAnnotation`/`buildShapeDraft`, not by drawing directly in the pointer handlers.
+- **Undo is a snapshot history, not `annotations.pop()`.** An earlier version just popped the array,
+  which "undid" a move by deleting the moved shape entirely instead of reverting its position — wrong.
+  `pushHistory()` snapshots the *whole* `annotations` array immediately before any change (adding a
+  shape, starting a move, clearing), and `undo()` restores the last snapshot wholesale. Every mutation
+  site must call `pushHistory()` first — a move's snapshot is taken at `pointerdown` (before
+  `translateAnnotation` touches anything) and discarded by `cancelMove()` if Esc cancels it, since
+  nothing actually changed. If you add a new kind of mutation, give it the same treatment.
+  Dragging itself (`hitTest()` finds the shape; `translateAnnotation()` recomputes position from the
+  *original* snapshot plus total pointer delta each `pointermove`, not accumulated per-frame deltas,
+  which would drift) doesn't call `pushHistory()` on every frame — only once, at drag start.
+- **Hit-test tolerance scales with the capture's resolution** (`annotationCanvas.width * 0.01`, same
+  pattern as the relative stroke widths in `drawRect`/`drawArrow`), so grabbing a thin line feels
+  consistent whether the screenshot is small or large — don't hardcode a fixed pixel tolerance.
 - **Restricted pages (`chrome://`, etc.) are checked before injection**, not just caught as a thrown
   error — `background.js`'s `isRestrictedUrl` short-circuits and shows a `chrome.notifications` toast
   instead of attempting `chrome.scripting.executeScript`, since those pages can't run content scripts at

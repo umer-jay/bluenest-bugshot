@@ -3,13 +3,18 @@ import { sendCapture } from "./notion.js";
 const MAX_EXPORT_WIDTH = 1600;
 const EXPORT_QUALITY = 0.85;
 
-// Must match .annotation-text-input's CSS font-size, and its border + padding
-// (border 1px + padding-left 4px horizontally, border 1px + padding-top 2px
-// vertically), so committed text lands at the same size and position as what
-// was actually typed.
-const TEXT_INPUT_FONT_SIZE_CSS = 16;
+// The text input's border + padding (border 1px + padding-left 4px
+// horizontally, border 1px + padding-top 2px vertically) — needed so
+// committed text lands at the same position as what was actually typed.
+// Its font-size is adjustable (see the size stepper below), applied
+// per-instance in JS rather than fixed in CSS.
 const TEXT_INPUT_INSET_X_CSS = 5;
 const TEXT_INPUT_INSET_Y_CSS = 3;
+
+const FONT_SIZE_MIN_CSS = 10;
+const FONT_SIZE_MAX_CSS = 48;
+const FONT_SIZE_STEP_CSS = 2;
+const FONT_SIZE_DEFAULT_CSS = 16;
 
 const metaEl = document.getElementById("meta");
 const errorEl = document.getElementById("error");
@@ -32,14 +37,25 @@ const undoButton = document.getElementById("undo-button");
 const clearButton = document.getElementById("clear-button");
 const toolButtons = Array.from(document.querySelectorAll(".tool-btn"));
 const colorButtons = Array.from(document.querySelectorAll(".color-swatch"));
+const fontSizeDisplay = document.getElementById("font-size-display");
+const fontSizeDecreaseBtn = document.getElementById("font-size-decrease");
+const fontSizeIncreaseBtn = document.getElementById("font-size-increase");
 
 let captureRect = null;
 let capturePageMeta = null;
 let annotations = [];
+// Snapshots of `annotations` taken right before each change (add, move,
+// clear) — undo restores the whole array to the last snapshot, so it
+// reverts ANY change, not just "remove the most recently added shape."
+let history = [];
 let draft = null;
 let dragStart = null;
+let movingIndex = -1;
+let moveStart = null;
+let moveOriginal = null;
 let currentTool = "select";
 let currentColor = "#dc2626";
+let currentFontSizeCss = FONT_SIZE_DEFAULT_CSS;
 
 function showError(message) {
   errorEl.textContent = message;
@@ -148,10 +164,83 @@ function drawAnnotation(ctx2d, ann) {
   else if (ann.type === "text") drawText(ctx2d, ann);
 }
 
+function drawSelectionHighlight(ctx2d, ann) {
+  const bounds = getAnnotationBounds(ann);
+  const pad = Math.max(4, annotationCanvas.width * 0.006);
+  ctx2d.save();
+  ctx2d.strokeStyle = "#2563eb";
+  ctx2d.lineWidth = Math.max(1.5, annotationCanvas.width * 0.002);
+  ctx2d.setLineDash([Math.max(4, annotationCanvas.width * 0.006), Math.max(3, annotationCanvas.width * 0.004)]);
+  ctx2d.strokeRect(bounds.x - pad, bounds.y - pad, bounds.width + pad * 2, bounds.height + pad * 2);
+  ctx2d.restore();
+}
+
 function redraw() {
   actx.clearRect(0, 0, annotationCanvas.width, annotationCanvas.height);
   for (const ann of annotations) drawAnnotation(actx, ann);
   if (draft) drawAnnotation(actx, draft);
+  if (movingIndex !== -1 && annotations[movingIndex]) {
+    drawSelectionHighlight(actx, annotations[movingIndex]);
+  }
+}
+
+// --- Move tool: hit-testing and repositioning ---------------------------
+
+function getAnnotationBounds(ann) {
+  if (ann.type === "rect") {
+    return { x: ann.x, y: ann.y, width: ann.width, height: ann.height };
+  }
+  if (ann.type === "arrow") {
+    return {
+      x: Math.min(ann.x1, ann.x2),
+      y: Math.min(ann.y1, ann.y2),
+      width: Math.abs(ann.x2 - ann.x1),
+      height: Math.abs(ann.y2 - ann.y1),
+    };
+  }
+  // text
+  actx.font = `600 ${ann.fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+  return { x: ann.x, y: ann.y, width: actx.measureText(ann.text).width, height: ann.fontSize * 1.2 };
+}
+
+function distanceToSegment(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const lengthSq = dx * dx + dy * dy;
+  let t = lengthSq === 0 ? 0 : ((px - x1) * dx + (py - y1) * dy) / lengthSq;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+
+// Returns the index of the topmost annotation under `point`, or -1.
+// Hit tolerance scales with the capture's resolution so it feels
+// consistent whether the screenshot is small or large.
+function hitTest(point) {
+  const tolerance = Math.max(8, annotationCanvas.width * 0.01);
+  for (let i = annotations.length - 1; i >= 0; i--) {
+    const ann = annotations[i];
+    if (ann.type === "arrow") {
+      if (distanceToSegment(point.x, point.y, ann.x1, ann.y1, ann.x2, ann.y2) <= tolerance) return i;
+      continue;
+    }
+    const b = getAnnotationBounds(ann);
+    if (
+      point.x >= b.x - tolerance &&
+      point.x <= b.x + b.width + tolerance &&
+      point.y >= b.y - tolerance &&
+      point.y <= b.y + b.height + tolerance
+    ) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function translateAnnotation(ann, dx, dy) {
+  if (ann.type === "arrow") {
+    return { ...ann, x1: ann.x1 + dx, y1: ann.y1 + dy, x2: ann.x2 + dx, y2: ann.y2 + dy };
+  }
+  return { ...ann, x: ann.x + dx, y: ann.y + dy };
 }
 
 // --- Tools and color ------------------------------------------------------
@@ -162,7 +251,7 @@ function setTool(tool) {
     btn.setAttribute("aria-pressed", String(btn.dataset.tool === tool));
   }
   annotationCanvas.style.cursor =
-    tool === "select" ? "default" : tool === "text" ? "text" : "crosshair";
+    tool === "select" ? "default" : tool === "text" ? "text" : tool === "move" ? "move" : "crosshair";
 }
 
 function setColor(color) {
@@ -171,6 +260,19 @@ function setColor(color) {
     btn.setAttribute("aria-pressed", String(btn.dataset.color === color));
   }
 }
+
+// Applies to the next text annotation created, not to text already placed —
+// same as how currentColor only affects new shapes.
+function setFontSize(size) {
+  currentFontSizeCss = Math.min(FONT_SIZE_MAX_CSS, Math.max(FONT_SIZE_MIN_CSS, size));
+  fontSizeDisplay.textContent = `${currentFontSizeCss}px`;
+  fontSizeDecreaseBtn.disabled = currentFontSizeCss <= FONT_SIZE_MIN_CSS;
+  fontSizeIncreaseBtn.disabled = currentFontSizeCss >= FONT_SIZE_MAX_CSS;
+}
+
+fontSizeDecreaseBtn.addEventListener("click", () => setFontSize(currentFontSizeCss - FONT_SIZE_STEP_CSS));
+fontSizeIncreaseBtn.addEventListener("click", () => setFontSize(currentFontSizeCss + FONT_SIZE_STEP_CSS));
+setFontSize(currentFontSizeCss);
 
 toolButtons.forEach((btn) => btn.addEventListener("click", () => setTool(btn.dataset.tool)));
 colorButtons.forEach((btn) => btn.addEventListener("click", () => setColor(btn.dataset.color)));
@@ -212,23 +314,66 @@ function onPointerDown(e) {
     return;
   }
 
+  if (currentTool === "move") {
+    const index = hitTest(point);
+    if (index === -1) return;
+    pushHistory();
+    movingIndex = index;
+    moveStart = point;
+    moveOriginal = annotations[index];
+    annotationCanvas.setPointerCapture(e.pointerId);
+    return;
+  }
+
   dragStart = point;
   annotationCanvas.setPointerCapture(e.pointerId);
 }
 
 function onPointerMove(e) {
+  if (movingIndex !== -1) {
+    const point = getCanvasPoint(e);
+    annotations[movingIndex] = translateAnnotation(
+      moveOriginal,
+      point.x - moveStart.x,
+      point.y - moveStart.y
+    );
+    redraw();
+    return;
+  }
   if (!dragStart) return;
   draft = buildShapeDraft(dragStart, getCanvasPoint(e));
   redraw();
 }
 
 function onPointerUp(e) {
+  if (movingIndex !== -1) {
+    movingIndex = -1;
+    moveStart = null;
+    moveOriginal = null;
+    redraw();
+    return;
+  }
   if (!dragStart) return;
   const shape = buildShapeDraft(dragStart, getCanvasPoint(e));
   dragStart = null;
   draft = null;
 
-  if (!shapeIsEmpty(shape)) annotations.push(shape);
+  if (!shapeIsEmpty(shape)) {
+    pushHistory();
+    annotations.push(shape);
+  }
+  redraw();
+}
+
+function cancelMove() {
+  if (movingIndex === -1) return;
+  annotations[movingIndex] = moveOriginal;
+  movingIndex = -1;
+  moveStart = null;
+  moveOriginal = null;
+  // Nothing actually changed, so drop the snapshot pushHistory() took when
+  // the drag started — otherwise Ctrl/Cmd+Z would restore an identical state.
+  history.pop();
   redraw();
 }
 
@@ -248,12 +393,17 @@ function isLightColor(hex) {
 function openTextInput(canvasPoint) {
   const { left, top } = canvasPointToCss(canvasPoint);
   const scale = getCanvasScale();
+  // Frozen at creation time so the committed text always matches exactly
+  // what was shown while typing, even if the size stepper is clicked
+  // again before this input is confirmed.
+  const fontSizeAtOpen = currentFontSizeCss;
 
   const input = document.createElement("input");
   input.type = "text";
   input.className = "annotation-text-input";
   input.style.left = `${left}px`;
   input.style.top = `${top}px`;
+  input.style.fontSize = `${fontSizeAtOpen}px`;
   input.style.color = currentColor;
   // The input's default background is light, so a light annotation color
   // (white) would be invisible while typing — swap to a dark background
@@ -276,13 +426,14 @@ function openTextInput(canvasPoint) {
     const value = input.value.trim();
     input.remove();
     if (!value) return;
+    pushHistory();
     annotations.push({
       type: "text",
       x: canvasPoint.x + TEXT_INPUT_INSET_X_CSS * scale,
       y: canvasPoint.y + TEXT_INPUT_INSET_Y_CSS * scale,
       text: value,
       color: currentColor,
-      fontSize: Math.round(TEXT_INPUT_FONT_SIZE_CSS * scale),
+      fontSize: Math.round(fontSizeAtOpen * scale),
     });
     redraw();
   }
@@ -307,13 +458,19 @@ function openTextInput(canvasPoint) {
 
 // --- Undo / clear -------------------------------------------------------
 
+function pushHistory() {
+  history.push(annotations.map((a) => ({ ...a })));
+}
+
 function undo() {
-  if (annotations.length === 0) return;
-  annotations.pop();
+  if (history.length === 0) return;
+  annotations = history.pop();
   redraw();
 }
 
 function clearAll() {
+  if (annotations.length === 0) return;
+  pushHistory();
   annotations = [];
   redraw();
 }
@@ -327,6 +484,9 @@ document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
     e.preventDefault();
     undo();
+  } else if (e.key === "Escape" && movingIndex !== -1) {
+    e.preventDefault();
+    cancelMove();
   }
 });
 
