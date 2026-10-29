@@ -4,8 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-In progress, built step by step from `plan.md` (Step 1 — skeleton and settings — is done; see
-`bluenest-bugshot/`). Treat `plan.md` as the source of truth for scope, file structure, and step order —
+In progress, built step by step from `plan.md` (Steps 1-2 — skeleton/settings and region select — are
+done; see `bluenest-bugshot/`). Treat `plan.md` as the source of truth for scope, file structure, and step order —
 this file only distills the constraints that matter while writing code. The extension is named
 **Bluenest Bugshot** (the Chrome-visible name); `plan.md` and code comments may still refer to it by its
 working title, "QA Screenshot to Notion."
