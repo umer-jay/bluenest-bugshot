@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Bluenest Bugshot — Settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Bluenest Bugshot</h1>
+      <p class="subtitle">Connect your Notion integration to start sending QA cards.</p>
+
+      <form id="settings-form">
+        <label for="token">Notion integration token</label>
+        <input type="password" id="token" name="token" autocomplete="off" placeholder="secret_..." />
+
+        <label for="databaseId">Database ID</label>
+        <input type="text" id="databaseId" name="databaseId" autocomplete="off" placeholder="QA Pipeline database ID" />
+
+        <label for="reporter">Reporter name</label>
+        <input type="text" id="reporter" name="reporter" autocomplete="off" placeholder="Your name" />
+
+        <div class="actions">
+          <button type="submit" id="save-button">Save</button>
+          <button type="button" id="test-button">Test connection</button>
+        </div>
+
+        <p id="status" class="status" role="status"></p>
+      </form>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>
