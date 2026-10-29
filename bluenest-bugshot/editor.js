@@ -3,6 +3,14 @@ import { sendCapture } from "./notion.js";
 const MAX_EXPORT_WIDTH = 1600;
 const EXPORT_QUALITY = 0.85;
 
+// Must match .annotation-text-input's CSS font-size, and its border + padding
+// (border 1px + padding-left 4px horizontally, border 1px + padding-top 2px
+// vertically), so committed text lands at the same size and position as what
+// was actually typed.
+const TEXT_INPUT_FONT_SIZE_CSS = 16;
+const TEXT_INPUT_INSET_X_CSS = 5;
+const TEXT_INPUT_INSET_Y_CSS = 3;
+
 const metaEl = document.getElementById("meta");
 const errorEl = document.getElementById("error");
 const toolbarEl = document.getElementById("toolbar");
@@ -81,6 +89,16 @@ function canvasPointToCss(point) {
   const scaleX = domRect.width / annotationCanvas.width;
   const scaleY = domRect.height / annotationCanvas.height;
   return { left: point.x * scaleX, top: point.y * scaleY };
+}
+
+// How many canvas-internal pixels correspond to one on-screen CSS pixel
+// right now. Needed for anything sized in canvas space (like committed text)
+// that has to visually match something sized in CSS space (like the text
+// input overlay) — devicePixelRatio alone isn't enough once the canvas is
+// also shrunk by `max-width: 100%`.
+function getCanvasScale() {
+  const domRect = annotationCanvas.getBoundingClientRect();
+  return annotationCanvas.width / domRect.width;
 }
 
 // --- Drawing -----------------------------------------------------------
@@ -220,8 +238,16 @@ annotationCanvas.addEventListener("pointerup", onPointerUp);
 
 // --- Text tool --------------------------------------------------------
 
+function isLightColor(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return 0.299 * r + 0.587 * g + 0.114 * b > 200;
+}
+
 function openTextInput(canvasPoint) {
   const { left, top } = canvasPointToCss(canvasPoint);
+  const scale = getCanvasScale();
 
   const input = document.createElement("input");
   input.type = "text";
@@ -229,6 +255,12 @@ function openTextInput(canvasPoint) {
   input.style.left = `${left}px`;
   input.style.top = `${top}px`;
   input.style.color = currentColor;
+  // The input's default background is light, so a light annotation color
+  // (white) would be invisible while typing — swap to a dark background
+  // for light colors so the typed text stays readable.
+  if (isLightColor(currentColor)) {
+    input.style.background = "rgba(17, 24, 39, 0.92)";
+  }
   canvasStack.appendChild(input);
   // The canvas's own default mousedown handling steals focus back if we
   // call .focus() synchronously here, so the input would blur (and commit
@@ -244,14 +276,13 @@ function openTextInput(canvasPoint) {
     const value = input.value.trim();
     input.remove();
     if (!value) return;
-    const fontSize = Math.round(24 * (captureRect.devicePixelRatio || 1));
     annotations.push({
       type: "text",
-      x: canvasPoint.x,
-      y: canvasPoint.y,
+      x: canvasPoint.x + TEXT_INPUT_INSET_X_CSS * scale,
+      y: canvasPoint.y + TEXT_INPUT_INSET_Y_CSS * scale,
       text: value,
       color: currentColor,
-      fontSize,
+      fontSize: Math.round(TEXT_INPUT_FONT_SIZE_CSS * scale),
     });
     redraw();
   }

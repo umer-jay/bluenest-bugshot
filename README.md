@@ -106,3 +106,11 @@ You only need to do this once per Notion workspace.
 No build step — vanilla JS, loaded unpacked directly. After any code change, reload the extension in
 `chrome://extensions` and check the service worker console (the "service worker" link on the extension's
 card) for errors. See `CLAUDE.md` for architecture and implementation notes.
+
+## Changelog
+
+- **v1.0.1** — Real app icon (was a placeholder red square). Fixed the text annotation tool: its
+  committed size/position on the image could drift noticeably from what you saw while typing, and white
+  text was invisible while typing (input box background is now dark for light colors).
+- **v1.0.0** — Initial release. All 6 steps of `plan.md` built: region capture, annotation editor
+  (text/arrow/rectangle), and Notion integration.

@@ -69,6 +69,14 @@ icon click / keyboard shortcut
   on-screen CSS size (`max-width: 100%` can shrink it), so pointer events must be rescaled via
   `getCanvasPoint()` before being stored as annotation coordinates — don't use `e.offsetX/offsetY`
   directly. This is independent of the capture-time DPI scaling above.
+- **Anything sized in canvas-internal pixels that must visually match something sized in CSS pixels
+  needs `getCanvasScale()`, not `devicePixelRatio`.** The text tool's annotation font size and position
+  previously used `devicePixelRatio` directly and drifted badly from the `.annotation-text-input`
+  overlay's actual CSS size/position — `devicePixelRatio` only accounts for retina scaling, not the
+  *additional* shrink from `max-width: 100%` on a capture wider than the container. `getCanvasScale()`
+  (`canvas.width / boundingClientRect.width`) is the real canvas-px-per-CSS-px ratio at render time;
+  `TEXT_INPUT_FONT_SIZE_CSS`/`_INSET_X_CSS`/`_INSET_Y_CSS` must stay in sync with
+  `.annotation-text-input`'s actual font-size/border/padding in `editor.css` if either changes.
 - **Annotations are data, not pixels, until export.** `editor.js` keeps a plain array of annotation
   objects (`{type, ...}`) redrawn in full on every change (`redraw()`), rather than drawing
   incrementally onto a persistent layer — this is what makes undo a simple array `pop()`. Add new tools
