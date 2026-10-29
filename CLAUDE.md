@@ -4,8 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-In progress, built step by step from `plan.md` (Steps 1-3 — skeleton/settings, region select, and
-capture/crop — are done; see `bluenest-bugshot/`). Treat `plan.md` as the source of truth for scope, file structure, and step order —
+In progress, built step by step from `plan.md` (Steps 1-4 — skeleton/settings, region select,
+capture/crop, and the annotation editor — are done; see `bluenest-bugshot/`). Treat `plan.md` as the source of truth for scope, file structure, and step order —
 this file only distills the constraints that matter while writing code. The extension is named
 **Bluenest Bugshot** (the Chrome-visible name); `plan.md` and code comments may still refer to it by its
 working title, "QA Screenshot to Notion."
@@ -63,6 +63,15 @@ icon click / keyboard shortcut
   `rect.devicePixelRatio` (captured from `window.devicePixelRatio` at selection time) when cropping in
   `editor.js` — this single value already accounts for both retina displays and non-100% browser zoom,
   since Chrome folds zoom into `devicePixelRatio`.
+- **A second, separate coordinate transform exists in `editor.js` for annotations.** The annotation
+  canvas's internal pixel grid (set to the cropped image's native resolution) is often larger than its
+  on-screen CSS size (`max-width: 100%` can shrink it), so pointer events must be rescaled via
+  `getCanvasPoint()` before being stored as annotation coordinates — don't use `e.offsetX/offsetY`
+  directly. This is independent of the capture-time DPI scaling above.
+- **Annotations are data, not pixels, until export.** `editor.js` keeps a plain array of annotation
+  objects (`{type, ...}`) redrawn in full on every change (`redraw()`), rather than drawing
+  incrementally onto a persistent layer — this is what makes undo a simple array `pop()`. Add new tools
+  by adding a case to `drawAnnotation`/`buildShapeDraft`, not by drawing directly in the pointer handlers.
 - **Restricted pages (`chrome://`, etc.) are checked before injection**, not just caught as a thrown
   error — `background.js`'s `isRestrictedUrl` short-circuits and shows a `chrome.notifications` toast
   instead of attempting `chrome.scripting.executeScript`, since those pages can't run content scripts at

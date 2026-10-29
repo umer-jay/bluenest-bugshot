@@ -9,9 +9,10 @@ Internal team tool — uses a Notion internal integration token, no OAuth or bac
 
 ## Status
 
-Built step by step from `plan.md`. **Steps 1-3 are done:** skeleton + settings, region select (drag to
-pick an area of the page), and capture/crop (screenshot taken, cropped to the selection, shown in a new
-tab). Annotation tools and the Notion send flow are still to come.
+Built step by step from `plan.md`. **Steps 1-4 are done:** skeleton + settings, region select, capture/crop,
+and the annotation editor (text/arrow/rectangle tools, undo, color picker, title/severity/notes form,
+and image export). The Notion send flow is still to come — Send currently exports and previews the
+flattened image instead of posting it anywhere.
 
 ## Install (development)
 
@@ -34,8 +35,10 @@ tab). Annotation tools and the Notion send flow are still to come.
 ## Usage (so far)
 
 Click the toolbar icon or press **Cmd+Shift+U** (Mac) / **Ctrl+Shift+U** (Windows/Linux) on any normal
-web page, then drag to select a region. A new tab opens showing the cropped screenshot. (Annotation and
-sending to Notion aren't wired up yet.)
+web page, then drag to select a region. A new tab opens with the cropped screenshot in an editor: pick a
+tool (text, arrow, or rectangle) and a color, draw on the image, undo with the button or Ctrl/Cmd+Z, fill
+in a title/severity/notes, and click Send to export the flattened, resized image (it opens in a new tab
+for now — actually sending it to Notion is still to come).
 
 ## Settings
 

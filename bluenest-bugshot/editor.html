@@ -8,9 +8,62 @@
   <body>
     <main>
       <p id="meta" class="meta"></p>
-      <div class="canvas-wrap">
-        <canvas id="canvas"></canvas>
+
+      <div class="toolbar" id="toolbar">
+        <div class="tool-group" role="group" aria-label="Tools">
+          <button type="button" class="tool-btn" data-tool="select" aria-pressed="true" title="Select — click here to stop drawing without picking another tool">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg>
+          </button>
+          <button type="button" class="tool-btn" data-tool="text" title="Text">T</button>
+          <button type="button" class="tool-btn" data-tool="arrow" title="Arrow">↗</button>
+          <button type="button" class="tool-btn" data-tool="rect" title="Rectangle">▢</button>
+        </div>
+
+        <div class="color-group" role="group" aria-label="Color">
+          <button type="button" class="color-swatch" data-color="#dc2626" style="--swatch:#dc2626" aria-pressed="true" title="Red"></button>
+          <button type="button" class="color-swatch" data-color="#ea580c" style="--swatch:#ea580c" title="Orange"></button>
+          <button type="button" class="color-swatch" data-color="#16a34a" style="--swatch:#16a34a" title="Green"></button>
+          <button type="button" class="color-swatch" data-color="#2563eb" style="--swatch:#2563eb" title="Blue"></button>
+          <button type="button" class="color-swatch" data-color="#111827" style="--swatch:#111827" title="Black"></button>
+          <button type="button" class="color-swatch" data-color="#ffffff" style="--swatch:#ffffff" title="White"></button>
+        </div>
+
+        <div class="action-group">
+          <button type="button" id="undo-button" title="Undo (Ctrl/Cmd+Z)">Undo</button>
+          <button type="button" id="clear-button" title="Clear all annotations">Clear</button>
+        </div>
       </div>
+
+      <div class="canvas-wrap">
+        <div class="canvas-stack" id="canvas-stack">
+          <canvas id="base-canvas"></canvas>
+          <canvas id="annotation-canvas"></canvas>
+        </div>
+      </div>
+
+      <form id="details-form" class="details-form">
+        <label for="title-input">Title</label>
+        <input type="text" id="title-input" placeholder="Short description of the issue" required />
+
+        <label for="severity-select">Severity</label>
+        <select id="severity-select">
+          <option value="Low">Low</option>
+          <option value="Medium" selected>Medium</option>
+          <option value="High">High</option>
+          <option value="Critical">Critical</option>
+        </select>
+
+        <label for="notes-textarea">Notes</label>
+        <textarea id="notes-textarea" rows="3" placeholder="Steps to reproduce, extra context..."></textarea>
+
+        <div class="form-actions">
+          <button type="button" id="cancel-button">Cancel</button>
+          <button type="submit" id="send-button">Send</button>
+        </div>
+
+        <p id="status" class="status" role="status"></p>
+      </form>
+
       <p id="error" class="error" hidden></p>
     </main>
     <script type="module" src="editor.js"></script>

@@ -19,8 +19,70 @@ main {
 .meta {
   font-size: 0.85rem;
   color: #6b7280;
-  margin: 0 0 1rem;
+  margin: 0 0 0.75rem;
   word-break: break-all;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+}
+
+.tool-group,
+.action-group {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.color-group {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.tool-btn,
+.action-group button {
+  font-size: 0.95rem;
+  min-width: 2.2rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tool-btn svg {
+  display: block;
+}
+
+.tool-btn[aria-pressed="true"] {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: white;
+}
+
+.color-swatch {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--swatch);
+  border: 2px solid transparent;
+  box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.35);
+  cursor: pointer;
+  padding: 0;
+}
+
+.color-swatch[aria-pressed="true"] {
+  border-color: #111827;
 }
 
 .canvas-wrap {
@@ -30,12 +92,117 @@ main {
   border: 1px solid #d1d5db;
   border-radius: 8px;
   padding: 0.5rem;
+  margin-bottom: 1rem;
 }
 
-canvas {
+.canvas-stack {
+  position: relative;
+  display: inline-block;
+}
+
+#base-canvas {
+  display: block;
   max-width: 100%;
   height: auto;
-  display: block;
+}
+
+#annotation-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: default;
+}
+
+.annotation-text-input {
+  position: absolute;
+  z-index: 5;
+  font: 600 16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  padding: 2px 4px;
+  border: 1px solid currentColor;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 3px;
+  min-width: 80px;
+}
+
+.details-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.details-form label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-top: 0.6rem;
+}
+
+.details-form input[type="text"],
+.details-form select,
+.details-form textarea {
+  font-size: 0.95rem;
+  font-family: inherit;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  outline-offset: 2px;
+  resize: vertical;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.1rem;
+}
+
+.form-actions button {
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+#send-button {
+  background: #2563eb;
+  color: white;
+}
+
+#send-button:hover {
+  background: #1d4ed8;
+}
+
+#send-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+#cancel-button {
+  background: transparent;
+  border-color: #d1d5db;
+  color: inherit;
+}
+
+#cancel-button:hover {
+  background: #f3f4f6;
+}
+
+.status {
+  min-height: 1.4em;
+  margin-top: 0.75rem;
+  font-size: 0.88rem;
+}
+
+.status.success {
+  color: #16a34a;
+}
+
+.status.error {
+  color: #dc2626;
 }
 
 .error {
