@@ -1,0 +1,44 @@
+:root {
+  color-scheme: light dark;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+main {
+  width: 100%;
+  max-width: 1000px;
+}
+
+.meta {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin: 0 0 1rem;
+  word-break: break-all;
+}
+
+.canvas-wrap {
+  display: flex;
+  justify-content: center;
+  background: repeating-conic-gradient(#e5e7eb 0% 25%, #f9fafb 0% 50%) 0 0 / 20px 20px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0.5rem;
+}
+
+canvas {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.error {
+  color: #dc2626;
+  font-size: 0.95rem;
+}

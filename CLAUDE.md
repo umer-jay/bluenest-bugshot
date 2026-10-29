@@ -4,8 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-In progress, built step by step from `plan.md` (Steps 1-2 — skeleton/settings and region select — are
-done; see `bluenest-bugshot/`). Treat `plan.md` as the source of truth for scope, file structure, and step order —
+In progress, built step by step from `plan.md` (Steps 1-3 — skeleton/settings, region select, and
+capture/crop — are done; see `bluenest-bugshot/`). Treat `plan.md` as the source of truth for scope, file structure, and step order —
 this file only distills the constraints that matter while writing code. The extension is named
 **Bluenest Bugshot** (the Chrome-visible name); `plan.md` and code comments may still refer to it by its
 working title, "QA Screenshot to Notion."
@@ -56,18 +56,28 @@ icon click / keyboard shortcut
 - **The service worker can be killed at any time.** Never hold flow state (screenshot, rectangle,
   metadata) in module-level/global variables in `background.js`. Pass it through `chrome.storage.session`
   between the capture step and `editor.html`.
-- **Overlay must not appear in the screenshot.** Remove the `content.js` overlay and wait a frame before
-  calling `captureVisibleTab`.
+- **Overlay must not appear in the screenshot.** `content.js` removes the overlay and waits two
+  `requestAnimationFrame`s (to let the removal actually paint) before messaging the background to call
+  `captureVisibleTab` — don't send that message synchronously with the DOM removal.
 - **Crop math must account for both DPI and zoom.** Multiply selection coordinates by
-  `window.devicePixelRatio` when cropping in `editor.js`. Test on a retina display and at non-100% zoom.
+  `rect.devicePixelRatio` (captured from `window.devicePixelRatio` at selection time) when cropping in
+  `editor.js` — this single value already accounts for both retina displays and non-100% browser zoom,
+  since Chrome folds zoom into `devicePixelRatio`.
+- **Restricted pages (`chrome://`, etc.) are checked before injection**, not just caught as a thrown
+  error — `background.js`'s `isRestrictedUrl` short-circuits and shows a `chrome.notifications` toast
+  instead of attempting `chrome.scripting.executeScript`, since those pages can't run content scripts at
+  all and a caught exception alone isn't a "friendly" user-facing message.
 - **Notion property names are centralized.** Keep all Notion database property names/types in one config
   object in `notion.js` (see schema in `plan.md` section 6) so a rename in Notion only requires one
   code change.
 - **Token handling.** The Notion integration token lives only in `chrome.storage.local`, set via
   `options.html`. Never hardcode it, never commit it, mask it in the settings UI.
-- **Permissions stay minimal.** `activeTab`, `storage`, `scripting`, plus the host permission
-  `https://api.notion.com/*` (required for Notion API calls — the one explicit exception to avoiding
-  host permissions). Don't add broader host permissions without updating `plan.md`.
+- **Permissions stay minimal.** `activeTab`, `storage`, `scripting`, `notifications`, plus the host
+  permission `https://api.notion.com/*` (required for Notion API calls — the one explicit exception to
+  avoiding host permissions). `notifications` was added in Step 3, beyond `plan.md` section 3's original
+  list, specifically so `background.js` can show a toast for "can't capture this page" — a page a content
+  script can't be injected into also can't display an in-page error. Don't add further permissions
+  without a similarly concrete reason.
 - **`content.js` is a classic (non-module) script re-injected via `chrome.scripting.executeScript` on every
   trigger**, not loaded once. Its whole body must stay wrapped in an IIFE (top-level `let`/`const` would
   throw "already declared" on a second injection in the same page), and it guards against a second

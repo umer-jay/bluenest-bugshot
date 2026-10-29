@@ -87,18 +87,27 @@
       return;
     }
 
-    chrome.runtime.sendMessage({
-      type: "qa-capture-region-selected",
-      rect: {
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height,
-        devicePixelRatio: window.devicePixelRatio,
-      },
-    });
-
+    const devicePixelRatio = window.devicePixelRatio;
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
     cleanup();
+
+    // Wait two frames so the overlay's removal has actually painted before
+    // the background takes the screenshot, or the dim overlay shows up in it.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        chrome.runtime.sendMessage({
+          type: "qa-capture-region-selected",
+          rect: {
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+            devicePixelRatio,
+          },
+          viewport,
+        });
+      });
+    });
   }
 
   function onKeyDown(e) {
