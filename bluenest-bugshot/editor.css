@@ -85,6 +85,20 @@ main {
   border-color: #111827;
 }
 
+.tool-btn:focus-visible,
+.color-swatch:focus-visible,
+.action-group button:focus-visible,
+.form-actions button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.hints {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin: 0 0 0.75rem;
+}
+
 .canvas-wrap {
   display: flex;
   justify-content: center;
@@ -151,6 +165,13 @@ main {
   resize: vertical;
 }
 
+.details-form input[type="text"]:focus-visible,
+.details-form select:focus-visible,
+.details-form textarea:focus-visible {
+  outline: 2px solid #2563eb;
+  border-color: #2563eb;
+}
+
 .form-actions {
   display: flex;
   justify-content: flex-end;
@@ -181,14 +202,42 @@ main {
   cursor: default;
 }
 
-#cancel-button {
+#send-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.spinner {
+  width: 0.9em;
+  height: 0.9em;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+#cancel-button,
+#copy-button {
   background: transparent;
   border-color: #d1d5db;
   color: inherit;
 }
 
-#cancel-button:hover {
+#cancel-button:hover,
+#copy-button:hover {
   background: #f3f4f6;
+}
+
+#copy-button:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .status {

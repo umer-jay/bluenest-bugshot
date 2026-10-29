@@ -4,8 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-In progress, built step by step from `plan.md` (Steps 1-4 — skeleton/settings, region select,
-capture/crop, and the annotation editor — are done; see `bluenest-bugshot/`). Treat `plan.md` as the source of truth for scope, file structure, and step order —
+MVP complete — all 6 steps of `plan.md` are built (see `bluenest-bugshot/`): skeleton/settings, region
+select, capture/crop, the annotation editor, Notion integration, and polish (spinner, remembered
+severity, clipboard-copy fallback, keyboard hints, team-facing `README.md`). Treat `plan.md` as the source of truth for scope, file structure, and step order —
 this file only distills the constraints that matter while writing code. The extension is named
 **Bluenest Bugshot** (the Chrome-visible name); `plan.md` and code comments may still refer to it by its
 working title, "QA Screenshot to Notion."
@@ -97,11 +98,34 @@ icon click / keyboard shortcut
   the 2025-09-03 breaking change, a database's schema and rows live under a `data_source_id`, not the
   `database_id` directly — `GET /v1/databases/{id}` only returns a `data_sources` array; fetching
   properties or creating pages requires resolving `data_sources[0].id` first via
-  `GET /v1/data_sources/{id}`. `notion.js` already does this resolution (see `testConnection`); reuse
-  it rather than re-deriving it in Step 5's page-creation flow. Re-check `developers.notion.com` if the
-  pinned version is bumped.
+  `GET /v1/data_sources/{id}`. Both `testConnection` and `sendCapture` share this resolution via
+  `resolveDatabase()` — don't re-derive it elsewhere. Re-check `developers.notion.com` if the pinned
+  version is bumped.
+- **Notion page creation builds property values from the live schema's types, not hardcoded
+  assumptions.** `sendCapture` reads each property's actual `type` (title/rich_text/url/number/date/
+  select/status) from the resolved data source and dispatches through `buildPropertyValue` — this is
+  specifically so a "Status" property can be either a Status-type or Select-type column (plan.md section
+  6 allows either) without special-casing it. Add a new mapped field by adding it to `NOTION_PROPERTIES`
+  and `buildPropertyValue`'s `fieldValues`, not by hand-building its JSON shape at the call site.
+- **Sending refuses to run with missing properties rather than partially succeeding.** `sendCapture`
+  checks for the same missing-properties condition `testConnection` reports, and throws before
+  uploading anything if any are missing — this avoids creating a page with a blank title (or similar)
+  when a property was silently skipped. Don't change this to skip-and-continue.
+- **The file upload flow is two calls, not one.** `POST /v1/file_uploads` creates the upload object
+  (JSON body: mode/filename/content_type); the actual bytes go to the *fixed* endpoint
+  `POST /v1/file_uploads/{id}/send` as `multipart/form-data` with a `file` field — never the `upload_url`
+  from the create response. The `Content-Type` header must be omitted (not set to anything) on that
+  second call so `fetch` can generate the multipart boundary itself.
+- **Send is guarded against double-submit.** `editor.js` disables `sendButton` synchronously inside the
+  submit handler, before any `await`, and only re-enables it on failure — never in a `finally`. This is
+  what makes "send twice quickly" not create duplicate Notion pages (see `plan.md` section 8's test
+  checklist).
+- **The clipboard-copy export is PNG, not the JPEG used for the Notion upload.** The Async Clipboard API
+  only reliably supports `image/png` in a `ClipboardItem` — `image/jpeg` isn't broadly readable by other
+  apps pasting from the clipboard. `editor.js`'s `exportForClipboard()` is a separate, uncompressed,
+  non-resized flatten from `exportFlattenedImage()`; don't merge them to "avoid duplication."
 
-## Planned file structure
+## File structure
 
 ```
 bluenest-bugshot/
@@ -117,6 +141,6 @@ bluenest-bugshot/
   options.js
   options.css
   icons/
-  .cursor/rules/extension.mdc
-  plan.md
 ```
+
+(`plan.md`, `CLAUDE.md`, and `README.md` live at the repo root, one level up from this folder.)

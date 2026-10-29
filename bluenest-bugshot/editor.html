@@ -34,6 +34,8 @@
         </div>
       </div>
 
+      <p class="hints">Shortcuts: Ctrl/Cmd+Z to undo · Enter to confirm text · Esc to cancel the current text box</p>
+
       <div class="canvas-wrap">
         <div class="canvas-stack" id="canvas-stack">
           <canvas id="base-canvas"></canvas>
@@ -57,8 +59,12 @@
         <textarea id="notes-textarea" rows="3" placeholder="Steps to reproduce, extra context..."></textarea>
 
         <div class="form-actions">
+          <button type="button" id="copy-button" title="Copy the flattened image to your clipboard">Copy Image</button>
           <button type="button" id="cancel-button">Cancel</button>
-          <button type="submit" id="send-button">Send</button>
+          <button type="submit" id="send-button">
+            <span class="spinner" id="send-spinner" hidden></span>
+            <span id="send-label">Send</span>
+          </button>
         </div>
 
         <p id="status" class="status" role="status"></p>

@@ -1,5 +1,4 @@
-// Sending to Notion is wired up in a later step. For now, Send flattens
-// and exports the image so the annotation flow can be verified end to end.
+import { sendCapture } from "./notion.js";
 
 const MAX_EXPORT_WIDTH = 1600;
 const EXPORT_QUALITY = 0.85;
@@ -13,7 +12,12 @@ const annotationCanvas = document.getElementById("annotation-canvas");
 const actx = annotationCanvas.getContext("2d");
 const detailsForm = document.getElementById("details-form");
 const titleInput = document.getElementById("title-input");
+const severitySelect = document.getElementById("severity-select");
+const notesTextarea = document.getElementById("notes-textarea");
 const sendButton = document.getElementById("send-button");
+const sendSpinner = document.getElementById("send-spinner");
+const sendLabel = document.getElementById("send-label");
+const copyButton = document.getElementById("copy-button");
 const cancelButton = document.getElementById("cancel-button");
 const statusEl = document.getElementById("status");
 const undoButton = document.getElementById("undo-button");
@@ -22,6 +26,7 @@ const toolButtons = Array.from(document.querySelectorAll(".tool-btn"));
 const colorButtons = Array.from(document.querySelectorAll(".color-swatch"));
 
 let captureRect = null;
+let capturePageMeta = null;
 let annotations = [];
 let draft = null;
 let dragStart = null;
@@ -41,6 +46,19 @@ function setStatus(message, kind) {
   statusEl.textContent = message;
   statusEl.classList.remove("success", "error");
   if (kind) statusEl.classList.add(kind);
+}
+
+function setStatusWithLink(message, url, linkText) {
+  statusEl.textContent = "";
+  statusEl.classList.remove("error");
+  statusEl.classList.add("success");
+  statusEl.appendChild(document.createTextNode(`${message} `));
+  const link = document.createElement("a");
+  link.href = url;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = linkText;
+  statusEl.appendChild(link);
 }
 
 // --- Coordinate conversion -------------------------------------------------
@@ -283,51 +301,112 @@ document.addEventListener("keydown", (e) => {
 
 // --- Export -------------------------------------------------------------
 
-async function exportFlattenedImage() {
-  const sourceWidth = baseCanvas.width;
-  const sourceHeight = baseCanvas.height;
-  const scale = Math.min(1, MAX_EXPORT_WIDTH / sourceWidth);
-  const targetWidth = Math.round(sourceWidth * scale);
-  const targetHeight = Math.round(sourceHeight * scale);
-
+function flattenToBlob(targetWidth, targetHeight, mimeType, quality) {
   const exportCanvas = document.createElement("canvas");
   exportCanvas.width = targetWidth;
   exportCanvas.height = targetHeight;
   const exportCtx = exportCanvas.getContext("2d");
   exportCtx.drawImage(baseCanvas, 0, 0, targetWidth, targetHeight);
   exportCtx.drawImage(annotationCanvas, 0, 0, targetWidth, targetHeight);
+  return new Promise((resolve) => exportCanvas.toBlob(resolve, mimeType, quality));
+}
 
-  const blob = await new Promise((resolve) =>
-    exportCanvas.toBlob(resolve, "image/jpeg", EXPORT_QUALITY)
-  );
-
+async function exportFlattenedImage() {
+  const sourceWidth = baseCanvas.width;
+  const sourceHeight = baseCanvas.height;
+  const scale = Math.min(1, MAX_EXPORT_WIDTH / sourceWidth);
+  const targetWidth = Math.round(sourceWidth * scale);
+  const targetHeight = Math.round(sourceHeight * scale);
+  const blob = await flattenToBlob(targetWidth, targetHeight, "image/jpeg", EXPORT_QUALITY);
   return { blob, width: targetWidth, height: targetHeight };
+}
+
+// The clipboard's Async Clipboard API only reliably supports image/png for
+// ClipboardItem.write — image/jpeg isn't broadly readable by other apps —
+// so this is a separate, uncompressed export rather than reusing the JPEG
+// path meant for the Notion upload.
+async function exportForClipboard() {
+  return flattenToBlob(baseCanvas.width, baseCanvas.height, "image/png");
+}
+
+function setSending(isSending) {
+  sendButton.disabled = isSending;
+  sendSpinner.hidden = !isSending;
+  sendLabel.textContent = isSending ? "Sending…" : "Send";
+  copyButton.disabled = isSending;
 }
 
 detailsForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  sendButton.disabled = true;
-  setStatus("Exporting…");
+  // Disabled immediately and only re-enabled on failure, so a double-click
+  // or a second Enter press can't fire a duplicate send while one is
+  // already in flight or after one has already succeeded.
+  setSending(true);
+  cancelButton.disabled = true;
 
   try {
-    const { blob, width, height } = await exportFlattenedImage();
-    const sizeKb = Math.round(blob.size / 1024);
-    const previewUrl = URL.createObjectURL(blob);
-    window.open(previewUrl, "_blank");
-    setStatus(
-      `Export ready: ${width}×${height}px, ${sizeKb}KB — opened in a new tab. ` +
-        `(Sending to Notion isn't wired up yet.)`,
-      "success"
-    );
+    const { notionToken, notionDatabaseId, reporterName } = await chrome.storage.local.get([
+      "notionToken",
+      "notionDatabaseId",
+      "reporterName",
+    ]);
+
+    if (!notionToken || !notionDatabaseId) {
+      throw new Error(
+        "Set up your Notion token and database ID in Settings first (right-click the extension icon → Options)."
+      );
+    }
+
+    setStatus("Exporting…");
+    const { blob } = await exportFlattenedImage();
+
+    setStatus("Uploading to Notion…");
+    const { pageUrl } = await sendCapture({
+      token: notionToken,
+      databaseId: notionDatabaseId,
+      blob,
+      title: titleInput.value.trim(),
+      severity: severitySelect.value,
+      notes: notesTextarea.value.trim(),
+      reporter: reporterName || "",
+      pageMeta: capturePageMeta,
+      devicePixelRatio: captureRect.devicePixelRatio,
+    });
+
+    await chrome.storage.local.set({ lastSeverity: severitySelect.value });
+
+    setStatusWithLink("Sent!", pageUrl, "Open in Notion");
+    cancelButton.disabled = false;
+    cancelButton.textContent = "Close";
+    sendSpinner.hidden = true;
+    sendLabel.textContent = "Sent";
   } catch (err) {
-    setStatus(`Export failed: ${err.message}`, "error");
-  } finally {
-    sendButton.disabled = false;
+    setStatus(err.message, "error");
+    setSending(false);
+    cancelButton.disabled = false;
   }
 });
 
 cancelButton.addEventListener("click", () => {
   window.close();
+});
+
+copyButton.addEventListener("click", async () => {
+  copyButton.disabled = true;
+  const previousLabel = copyButton.textContent;
+  try {
+    const blob = await exportForClipboard();
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    copyButton.textContent = "Copied!";
+  } catch (err) {
+    copyButton.textContent = "Copy failed";
+    console.error("[bluenest-bugshot] clipboard copy failed:", err.message);
+  } finally {
+    setTimeout(() => {
+      copyButton.textContent = previousLabel;
+      copyButton.disabled = false;
+    }, 1500);
+  }
 });
 
 // --- Load the capture and draw the crop ----------------------------------
@@ -341,6 +420,10 @@ async function init() {
 
   const { dataUrl, rect, pageMeta } = pendingCapture;
   captureRect = rect;
+  capturePageMeta = pageMeta;
+
+  const { lastSeverity } = await chrome.storage.local.get("lastSeverity");
+  if (lastSeverity) severitySelect.value = lastSeverity;
 
   const image = new Image();
   image.onload = () => {
