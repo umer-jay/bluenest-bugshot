@@ -9,8 +9,9 @@ Internal team tool — uses a Notion internal integration token, no OAuth or bac
 
 ## Status
 
-Built step by step from `plan.md`. **Step 1 (skeleton + settings) is done.** Region select, capture/crop,
-annotation, and the Notion send flow are still to come.
+Built step by step from `plan.md`. **Steps 1-3 are done:** skeleton + settings, region select (drag to
+pick an area of the page), and capture/crop (screenshot taken, cropped to the selection, shown in a new
+tab). Annotation tools and the Notion send flow are still to come.
 
 ## Install (development)
 
@@ -29,6 +30,12 @@ annotation, and the Notion send flow are still to come.
 > If the database comes back with no properties / "no data sources" when testing, it was likely created
 > as a top-level page from the sidebar. Recreate it as an inline table nested inside a page instead — see
 > the note in `CLAUDE.md`.
+
+## Usage (so far)
+
+Click the toolbar icon or press **Cmd+Shift+U** (Mac) / **Ctrl+Shift+U** (Windows/Linux) on any normal
+web page, then drag to select a region. A new tab opens showing the cropped screenshot. (Annotation and
+sending to Notion aren't wired up yet.)
 
 ## Settings
 
