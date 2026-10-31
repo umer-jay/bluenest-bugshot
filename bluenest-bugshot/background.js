@@ -15,6 +15,8 @@ function notify(title, message) {
     iconUrl: "icons/128.png",
     title,
     message,
+  }).catch((err) => {
+    console.error("[bluenest-bugshot] failed to show notification:", err.message);
   });
 }
 
@@ -46,8 +48,27 @@ async function getActiveTab() {
   return tab;
 }
 
+function isValidRect(rect) {
+  return (
+    !!rect &&
+    Number.isFinite(rect.x) &&
+    Number.isFinite(rect.y) &&
+    Number.isFinite(rect.width) &&
+    Number.isFinite(rect.height) &&
+    rect.width > 0 &&
+    rect.height > 0 &&
+    Number.isFinite(rect.devicePixelRatio) &&
+    rect.devicePixelRatio > 0
+  );
+}
+
 async function handleRegionSelected(message, tab) {
   if (!tab || !tab.id) return;
+
+  if (!isValidRect(message.rect)) {
+    console.error("[bluenest-bugshot] ignoring malformed capture message:", message);
+    return;
+  }
 
   let dataUrl;
   try {
@@ -94,6 +115,10 @@ chrome.commands.onCommand.addListener(async (command) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender) => {
+  // Defense in depth: nothing external can actually reach this listener
+  // (no externally_connectable declared), but verify the sender is this
+  // extension's own content script rather than trusting message.type alone.
+  if (sender.id !== chrome.runtime.id) return;
   if (message?.type !== "qa-capture-region-selected") return;
   console.log("[bluenest-bugshot] region selected on tab", sender.tab?.id, message.rect);
   handleRegionSelected(message, sender.tab);

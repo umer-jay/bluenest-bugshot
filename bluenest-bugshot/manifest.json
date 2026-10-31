@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Bluenest Bugshot",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Select a region of a page, annotate it, and send it to a Notion database as a QA card.",
   "action": {
     "default_title": "Capture QA screenshot"
@@ -29,5 +29,8 @@
     "open_in_tab": true
   },
   "permissions": ["activeTab", "storage", "scripting", "notifications"],
-  "host_permissions": ["https://api.notion.com/*"]
+  "host_permissions": ["https://api.notion.com/*"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
 }

@@ -112,6 +112,9 @@ card) for errors. See `CLAUDE.md` for architecture and implementation notes.
 
 ## Changelog
 
+- **v1.1.1** — Hardening from a Chrome extension best-practices audit: explicit CSP in the manifest,
+  a 20s timeout on Notion API calls (so a hung connection can't leave Send stuck forever), and some
+  defense-in-depth message validation in the background script. No user-visible behavior change.
 - **v1.1.0** — Added a Move tool: click and drag an existing annotation to reposition it (Esc cancels
   an in-progress move). Rebuilt Undo as a proper history of snapshots instead of "remove the last
   annotation," so it now correctly reverts a move (or a Clear) instead of deleting an unrelated shape.

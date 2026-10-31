@@ -32,6 +32,21 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const REQUEST_TIMEOUT_MS = 20000;
+
+// A hung connection to api.notion.com would otherwise leave the caller
+// (editor.js's Send flow) stuck on "Uploading…" forever, with neither the
+// success nor the catch path ever firing.
+async function fetchWithTimeout(url, options) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 // Retries once or twice on a 429 (waiting the length of Retry-After) before
 // giving up, per plan.md's "rate limit (retry after a short delay)" case.
 async function requestWithRetry(url, options) {
@@ -39,8 +54,11 @@ async function requestWithRetry(url, options) {
   while (true) {
     let response;
     try {
-      response = await fetch(url, options);
+      response = await fetchWithTimeout(url, options);
     } catch (err) {
+      if (err.name === "AbortError") {
+        throw new Error("Request to Notion timed out. Check your connection and try again.");
+      }
       throw new Error("Network error reaching Notion. Check your internet connection.");
     }
 

@@ -153,6 +153,16 @@ icon click / keyboard shortcut
   only reliably supports `image/png` in a `ClipboardItem` — `image/jpeg` isn't broadly readable by other
   apps pasting from the clipboard. `editor.js`'s `exportForClipboard()` is a separate, uncompressed,
   non-resized flatten from `exportFlattenedImage()`; don't merge them to "avoid duplication."
+- **Explicit CSP, request timeouts, and message validation are deliberate hardening, not defaults to
+  relax.** Following a best-practices audit: `manifest.json` declares `content_security_policy` explicitly
+  (`script-src 'self'; object-src 'self'`) rather than relying on MV3's implicit default, even though
+  they're currently identical. `notion.js`'s `requestWithRetry` wraps every call in a 20s
+  `AbortController` timeout (`fetchWithTimeout`) so a hung connection can't leave `editor.js`'s Send flow
+  stuck on "Uploading…" forever. `background.js`'s `runtime.onMessage` listener checks
+  `sender.id === chrome.runtime.id` before anything else (defense in depth — nothing external can reach
+  it today, since there's no `externally_connectable`, but don't assume that stays true if the manifest
+  changes), and `handleRegionSelected` validates `message.rect`'s shape (`isValidRect`) before trusting
+  it, rather than passing a possibly-malformed rect through to `editor.js`'s crop math.
 
 ## File structure
 
