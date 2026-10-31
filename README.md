@@ -79,17 +79,24 @@ You only need to do this once per Notion workspace.
 
 ## 5. Use it
 
-1. Click the toolbar icon, or press **Cmd+Shift+U** (Mac) / **Ctrl+Shift+U** (Windows/Linux), on any
-   normal web page (not a `chrome://` page or the Chrome Web Store — those can't be captured).
-2. Drag to select the area you want. Esc cancels; releasing confirms.
-3. A new tab opens with the cropped screenshot. Pick a tool — **Select** (pointer icon, pauses drawing),
+1. Pick a capture mode, on any normal web page (not a `chrome://` page or the Chrome Web Store — those
+   can't be captured):
+   - **Select a region** — click the toolbar icon, or **Cmd+Shift+U** (Mac) / **Ctrl+Shift+U**
+     (Windows/Linux). Drag to select the area you want; Esc cancels, releasing confirms.
+   - **Capture the visible area** — right-click the toolbar icon → "Capture visible area", or
+     **Cmd+Shift+Y** / **Ctrl+Shift+Y**. No selection needed, captures exactly what's on screen.
+   - **Capture the full page** — right-click the toolbar icon → "Capture full page", or
+     **Cmd+Shift+F** / **Ctrl+Shift+F**. Scrolls and stitches the whole page into one image (takes a few
+     seconds on a long page; very long pages are capped rather than captured in full). One known
+     limitation: fixed headers/banners will appear duplicated at each stitch point.
+2. A new tab opens with the captured screenshot. Pick a tool — **Select** (pointer icon, pauses drawing),
    **Move** (drag an existing annotation to reposition it; Esc cancels mid-drag), **T** (text — click,
    type, Enter to confirm), **↗** (arrow), **▢** (rectangle) — and a color, then draw on the image. Use
    the **− / +** stepper to set the text size (10–48px) before placing a text annotation; it applies to
    the next one you create, not to text already placed. Undo (button or Ctrl/Cmd+Z) reverts the last
    change, whatever it was — adding a shape, moving one, or Clear; Clear wipes everything.
-4. Fill in a Title (required), Severity, and Notes.
-5. Click **Send**. It uploads the flattened screenshot and creates a card in your QA Pipeline database,
+3. Fill in a Title (required), Severity, and Notes.
+4. Click **Send**. It uploads the flattened screenshot and creates a card in your QA Pipeline database,
    then shows a link to open it. If you just want the image itself, **Copy Image** copies it to your
    clipboard to paste elsewhere (Slack, docs, etc.) instead.
 
@@ -112,6 +119,10 @@ card) for errors. See `CLAUDE.md` for architecture and implementation notes.
 
 ## Changelog
 
+- **v1.2.0** — Two new capture modes, via right-click on the toolbar icon or a keyboard shortcut:
+  **Capture visible area** (no selection needed) and **Capture full page** (scrolls and stitches the
+  whole page into one image; very long pages are capped, and fixed headers/banners duplicate at each
+  stitch seam — a known limitation, not a bug).
 - **v1.1.1** — Hardening from a Chrome extension best-practices audit: explicit CSP in the manifest,
   a 20s timeout on Notion API calls (so a hung connection can't leave Send stuck forever), and some
   defense-in-depth message validation in the background script. No user-visible behavior change.

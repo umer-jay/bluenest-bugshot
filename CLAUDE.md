@@ -4,12 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-MVP complete — all 6 steps of `plan.md` are built (see `bluenest-bugshot/`): skeleton/settings, region
-select, capture/crop, the annotation editor, Notion integration, and polish (spinner, remembered
-severity, clipboard-copy fallback, keyboard hints, team-facing `README.md`). Treat `plan.md` as the source of truth for scope, file structure, and step order —
-this file only distills the constraints that matter while writing code. The extension is named
-**Bluenest Bugshot** (the Chrome-visible name); `plan.md` and code comments may still refer to it by its
-working title, "QA Screenshot to Notion."
+MVP complete (all 6 steps of `plan.md`) plus several post-MVP additions: a Move tool, a real undo
+history, adjustable text size, a Chrome best-practices hardening pass, and two more capture modes —
+visible-area and full-page — beyond the original region-select-only scope. Note that full-page capture
+was explicitly listed as "out of scope for MVP" in `plan.md` section 2; it's since been added anyway at
+the user's request, so treat `plan.md` as the historical starting scope, not the current feature ceiling.
+This file documents the as-built state. The extension is named **Bluenest Bugshot** (the Chrome-visible
+name); `plan.md` and code comments may still refer to it by its working title, "QA Screenshot to Notion."
 
 ## What this is
 
@@ -51,6 +52,24 @@ icon click / keyboard shortcut
              creates the database page with properties filled in
              attaches the image as a block in the page body
 ```
+
+This diagram shows region-select (the icon click / `capture-region` shortcut). Two more trigger paths — the
+`capture-visible`/`capture-fullpage` keyboard shortcuts and the toolbar icon's right-click menu
+(`chrome.contextMenus`) — converge onto the *same* `handleRegionSelected()` → `chrome.storage.session` →
+`editor.html` tail as region-select, just with a different `rect`:
+- **Visible area** (`captureVisibleOnly`): measures the viewport via `chrome.scripting.executeScript`'s
+  `func:` form (no content script injection needed for a one-off value read), then calls
+  `handleRegionSelected` with a rect spanning the whole viewport — no new capture logic at all.
+- **Full page** (`captureFullPage`): scrolls in viewport-height increments (`scrollTabTo`), capturing each
+  screen 600ms apart with quota-retry (`captureVisibleTabWithRetry`, since `captureVisibleTab` is
+  hard-capped at 2 calls/sec), stitches them with `OffscreenCanvas`/`createImageBitmap` — natively
+  available in MV3 service workers, no DOM needed — into one JPEG, then calls `handleRegionSelected` with
+  a `precomputedDataUrl` so it skips its own `captureVisibleTab` call. Capped at
+  `FULL_PAGE_MAX_SHOTS` (25) and `FULL_PAGE_MAX_HEIGHT_PX` (30000, to stay under Chrome's canvas size
+  limit), whichever is smaller, with a notification if a page gets truncated. **Known limitation, not a
+  bug to fix casually:** fixed/sticky elements (headers, cookie banners) appear once per captured screen,
+  so they're duplicated at each stitch seam — detecting and hiding them during capture would fix this but
+  is real added complexity, and every basic scroll-and-stitch tool has this same limitation.
 
 ## Critical constraints
 
@@ -111,11 +130,12 @@ icon click / keyboard shortcut
   code change.
 - **Token handling.** The Notion integration token lives only in `chrome.storage.local`, set via
   `options.html`. Never hardcode it, never commit it, mask it in the settings UI.
-- **Permissions stay minimal.** `activeTab`, `storage`, `scripting`, `notifications`, plus the host
-  permission `https://api.notion.com/*` (required for Notion API calls — the one explicit exception to
-  avoiding host permissions). `notifications` was added in Step 3, beyond `plan.md` section 3's original
-  list, specifically so `background.js` can show a toast for "can't capture this page" — a page a content
-  script can't be injected into also can't display an in-page error. Don't add further permissions
+- **Permissions stay minimal.** `activeTab`, `storage`, `scripting`, `notifications`, `contextMenus`, plus
+  the host permission `https://api.notion.com/*` (required for Notion API calls — the one explicit
+  exception to avoiding host permissions). `notifications` was added in Step 3, beyond `plan.md` section
+  3's original list, specifically so `background.js` can show a toast for "can't capture this page" — a
+  page a content script can't be injected into also can't display an in-page error. `contextMenus` was
+  added for the visible-area/full-page capture modes' right-click trigger. Don't add further permissions
   without a similarly concrete reason.
 - **`content.js` is a classic (non-module) script re-injected via `chrome.scripting.executeScript` on every
   trigger**, not loaded once. Its whole body must stay wrapped in an IIFE (top-level `let`/`const` would

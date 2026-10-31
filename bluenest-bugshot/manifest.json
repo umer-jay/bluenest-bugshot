@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Bluenest Bugshot",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Select a region of a page, annotate it, and send it to a Notion database as a QA card.",
   "action": {
     "default_title": "Capture QA screenshot"
@@ -22,13 +22,27 @@
         "mac": "Command+Shift+U"
       },
       "description": "Capture and annotate a region to send to Notion"
+    },
+    "capture-visible": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y"
+      },
+      "description": "Capture the visible area and annotate it"
+    },
+    "capture-fullpage": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+F",
+        "mac": "Command+Shift+F"
+      },
+      "description": "Capture the full page (scrolling) and annotate it"
     }
   },
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true
   },
-  "permissions": ["activeTab", "storage", "scripting", "notifications"],
+  "permissions": ["activeTab", "storage", "scripting", "notifications", "contextMenus"],
   "host_permissions": ["https://api.notion.com/*"],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
