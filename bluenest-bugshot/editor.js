@@ -171,10 +171,39 @@ function drawText(ctx2d, ann) {
   ctx2d.fillText(ann.text, ann.x, ann.y);
 }
 
+// Pixelation, not a soft blur: downscale the region to a tiny canvas (which
+// discards the fine detail via the browser's own downsampling), then draw
+// that back up at full size with smoothing off. This is deliberately chosen
+// over a Gaussian blur, which is a well-known weak form of redaction that
+// can sometimes be partially reversed — pixelation at a block size this
+// large genuinely destroys the underlying detail.
+function drawBlur(ctx2d, ann) {
+  const sx = Math.round(ann.x);
+  const sy = Math.round(ann.y);
+  const sw = Math.round(ann.width);
+  const sh = Math.round(ann.height);
+  if (sw <= 0 || sh <= 0) return;
+
+  const blockSize = Math.max(6, Math.round(annotationCanvas.width * 0.012));
+  const smallW = Math.max(1, Math.round(sw / blockSize));
+  const smallH = Math.max(1, Math.round(sh / blockSize));
+
+  const tmp = document.createElement("canvas");
+  tmp.width = smallW;
+  tmp.height = smallH;
+  tmp.getContext("2d").drawImage(baseCanvas, sx, sy, sw, sh, 0, 0, smallW, smallH);
+
+  ctx2d.save();
+  ctx2d.imageSmoothingEnabled = false;
+  ctx2d.drawImage(tmp, 0, 0, smallW, smallH, sx, sy, sw, sh);
+  ctx2d.restore();
+}
+
 function drawAnnotation(ctx2d, ann) {
   if (ann.type === "rect") drawRect(ctx2d, ann);
   else if (ann.type === "arrow") drawArrow(ctx2d, ann);
   else if (ann.type === "text") drawText(ctx2d, ann);
+  else if (ann.type === "blur") drawBlur(ctx2d, ann);
 }
 
 // Dims everything outside `rect` (via four surrounding strips, not a
@@ -251,7 +280,7 @@ function renderBase() {
 // --- Move tool: hit-testing and repositioning ---------------------------
 
 function getAnnotationBounds(ann) {
-  if (ann.type === "rect") {
+  if (ann.type === "rect" || ann.type === "blur") {
     return { x: ann.x, y: ann.y, width: ann.width, height: ann.height };
   }
   if (ann.type === "arrow") {
@@ -394,14 +423,14 @@ colorButtons.forEach((btn) => btn.addEventListener("click", () => setColor(btn.d
 // --- Rectangle / arrow drag -------------------------------------------
 
 function buildShapeDraft(start, end) {
-  if (currentTool === "rect") {
+  if (currentTool === "rect" || currentTool === "blur") {
     return {
-      type: "rect",
+      type: currentTool,
       x: Math.min(start.x, end.x),
       y: Math.min(start.y, end.y),
       width: Math.abs(end.x - start.x),
       height: Math.abs(end.y - start.y),
-      color: currentColor,
+      ...(currentTool === "rect" ? { color: currentColor } : {}),
     };
   }
   if (currentTool === "arrow") {
@@ -412,7 +441,7 @@ function buildShapeDraft(start, end) {
 
 function shapeIsEmpty(shape) {
   if (!shape) return true;
-  if (shape.type === "rect") return shape.width < 2 || shape.height < 2;
+  if (shape.type === "rect" || shape.type === "blur") return shape.width < 2 || shape.height < 2;
   if (shape.type === "arrow") {
     return Math.hypot(shape.x2 - shape.x1, shape.y2 - shape.y1) < 2;
   }

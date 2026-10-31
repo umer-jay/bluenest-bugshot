@@ -91,10 +91,12 @@ You only need to do this once per Notion workspace.
      limitation: fixed headers/banners will appear duplicated at each stitch point.
 2. A new tab opens with the captured screenshot. Pick a tool — **Select** (pointer icon, pauses drawing),
    **Move** (drag an existing annotation to reposition it; Esc cancels mid-drag), **T** (text — click,
-   type, Enter to confirm), **↗** (arrow), **▢** (rectangle), or the **crop icon** (drag to select what
-   to keep, then click **Apply Crop** — especially useful after Capture Visible Area or Capture Full
-   Page, since those skip region selection entirely and give you the whole thing uncropped) — and a
-   color, then draw on the image. Use the **− / +** stepper to set the text size (10–48px) before
+   type, Enter to confirm), **↗** (arrow), **▢** (rectangle), the **mosaic icon** (**Blur** — drag over
+   something like an email or account ID to pixelate it; this is real pixelation, not a soft blur, so it
+   actually destroys the underlying detail), or the **crop icon** (drag to select what to keep, then
+   click **Apply Crop** — especially useful after Capture Visible Area or Capture Full Page, since those
+   skip region selection entirely and give you the whole thing uncropped) — and a color (ignored by
+   Blur/Crop), then draw on the image. Use the **− / +** stepper to set the text size (10–48px) before
    placing a text annotation; it applies to the next one you create, not to text already placed. Undo
    (button or Ctrl/Cmd+Z) reverts the last change, whatever it was — adding a shape, moving one, Clear,
    or a crop; Clear wipes everything (but doesn't undo a crop).
@@ -122,6 +124,10 @@ card) for errors. See `CLAUDE.md` for architecture and implementation notes.
 
 ## Changelog
 
+- **v1.4.0** — Added a Blur tool: drag over something sensitive (an email, account ID, etc.) to pixelate
+  it. Implemented as real pixelation, not a soft blur — a well-known weak form of redaction that can
+  sometimes be partially reversed — so it actually destroys the underlying detail. Works with Move,
+  Undo, and Crop like any other annotation.
 - **v1.3.0** — Added a Crop tool to the editor: drag to select what to keep, then Apply Crop or Cancel.
   Fully undoable (Ctrl/Cmd+Z reverts a crop like any other change). Mainly closes a gap from v1.2.0 —
   Capture Visible Area and Capture Full Page both skip region selection, so there was previously no way

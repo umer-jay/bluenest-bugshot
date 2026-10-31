@@ -5,8 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project status
 
 MVP complete (all 6 steps of `plan.md`) plus several post-MVP additions: a Move tool, a real undo
-history, adjustable text size, an in-editor Crop tool, a Chrome best-practices hardening pass, and two
-more capture modes — visible-area and full-page — beyond the original region-select-only scope. Note
+history, adjustable text size, an in-editor Crop tool, a Blur (pixelate) tool, a Chrome best-practices
+hardening pass, and two more capture modes — visible-area and full-page — beyond the original
+region-select-only scope. Note
 that full-page capture was explicitly listed as "out of scope for MVP" in `plan.md` section 2; it's since
 been added anyway at the user's request, so treat `plan.md` as the historical starting scope, not the
 current feature ceiling. This file documents the as-built state. The extension is named **Bluenest Bugshot** (the Chrome-visible
@@ -135,6 +136,25 @@ This diagram shows region-select (the icon click / `capture-region` shortcut). T
 - **The crop preview dims the four strips *around* the selection, not a clear+cutout.** Clearing the
   kept rectangle would also erase any annotations already drawn there earlier in the same `redraw()`
   call; four separate `fillRect` strips (top/bottom/left/right of the selection) never touch those pixels.
+- **Blur is pixelation, not a Gaussian blur, specifically because pixelation at a large enough block size
+  genuinely destroys the underlying detail — Gaussian blur is a well-documented weak form of redaction
+  that can sometimes be partially reversed.** Don't swap the implementation for a CSS/canvas blur filter
+  to "make it look smoother" without re-considering this.
+- **Blur is just another annotation `type` (`{type: "blur", x, y, width, height}`), not a separate
+  system.** It deliberately reuses the entire existing vector-annotation machinery — `buildShapeDraft`,
+  `shapeIsEmpty`, `getAnnotationBounds` (treated identically to `"rect"` in all three), `hitTest`,
+  `translateAnnotation`, `pushHistory`/`undo`, and `applyCrop`'s translate+filter — which is what makes it
+  work correctly with Move, Undo, and Crop with zero special-casing in any of those functions.
+  `getAnnotationBounds` in particular has no generic fallback case; forgetting to add `"blur"` there
+  (easy to do, since the file falls through to the `"text"` branch) would silently call
+  `measureText(undefined)` and produce a bounding box with the wrong dimensions, breaking hit-testing and
+  crop-overlap filtering for every blur annotation.
+- **`drawBlur` reads from `baseCanvas` fresh on every `redraw()`, not a one-time destructive edit.**
+  Moving a blur re-samples the new position and leaves the old spot showing the original (never-altered)
+  image again — this is correct, expected behavior for a non-destructive vector annotation, not a leak.
+  The pixelation only becomes permanent when `redraw()`'s already-rendered `annotationCanvas` gets
+  flattened at export time (`flattenToBlob`) — no special handling needed there either, since by then the
+  blur is already baked into the canvas pixels like any other annotation.
 - **Hit-test tolerance scales with the capture's resolution** (`annotationCanvas.width * 0.01`, same
   pattern as the relative stroke widths in `drawRect`/`drawArrow`), so grabbing a thin line feels
   consistent whether the screenshot is small or large — don't hardcode a fixed pixel tolerance.
