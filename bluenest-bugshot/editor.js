@@ -16,6 +16,8 @@ const FONT_SIZE_MAX_CSS = 48;
 const FONT_SIZE_STEP_CSS = 2;
 const FONT_SIZE_DEFAULT_CSS = 16;
 
+const MIN_CROP_SIZE = 10;
+
 const metaEl = document.getElementById("meta");
 const errorEl = document.getElementById("error");
 const toolbarEl = document.getElementById("toolbar");
@@ -40,19 +42,30 @@ const colorButtons = Array.from(document.querySelectorAll(".color-swatch"));
 const fontSizeDisplay = document.getElementById("font-size-display");
 const fontSizeDecreaseBtn = document.getElementById("font-size-decrease");
 const fontSizeIncreaseBtn = document.getElementById("font-size-increase");
+const cropActionsEl = document.getElementById("crop-actions");
+const applyCropButton = document.getElementById("apply-crop-button");
+const cancelCropButton = document.getElementById("cancel-crop-button");
 
 let captureRect = null;
 let capturePageMeta = null;
+let originalImage = null; // the loaded, never-mutated Image; cropping just redraws from it
+// The current "view" into originalImage, in its device-pixel coordinate
+// space — {x, y, width, height}. Starts as the full captured rect; each
+// applied crop narrows it further (composed relative to this, not to
+// whatever the previous crop already showed).
+let cropRect = null;
 let annotations = [];
-// Snapshots of `annotations` taken right before each change (add, move,
-// clear) — undo restores the whole array to the last snapshot, so it
-// reverts ANY change, not just "remove the most recently added shape."
+// Snapshots of {annotations, cropRect} taken right before each change (add,
+// move, clear, crop) — undo restores both wholesale, so it reverts ANY
+// change, not just "remove the most recently added shape."
 let history = [];
 let draft = null;
 let dragStart = null;
 let movingIndex = -1;
 let moveStart = null;
 let moveOriginal = null;
+let cropDraft = null; // live preview while dragging a new crop selection
+let pendingCrop = null; // confirmed drag, awaiting Apply/Cancel
 let currentTool = "select";
 let currentColor = "#dc2626";
 let currentFontSizeCss = FONT_SIZE_DEFAULT_CSS;
@@ -164,6 +177,25 @@ function drawAnnotation(ctx2d, ann) {
   else if (ann.type === "text") drawText(ctx2d, ann);
 }
 
+// Dims everything outside `rect` (via four surrounding strips, not a
+// clear+cutout, so existing annotations drawn earlier in this same redraw()
+// stay fully visible inside the kept region instead of being wiped too).
+function drawCropOverlay(ctx2d, rect) {
+  const w = annotationCanvas.width;
+  const h = annotationCanvas.height;
+  ctx2d.save();
+  ctx2d.fillStyle = "rgba(0, 0, 0, 0.55)";
+  ctx2d.fillRect(0, 0, w, rect.y);
+  ctx2d.fillRect(0, rect.y + rect.height, w, h - (rect.y + rect.height));
+  ctx2d.fillRect(0, rect.y, rect.x, rect.height);
+  ctx2d.fillRect(rect.x + rect.width, rect.y, w - (rect.x + rect.width), rect.height);
+
+  ctx2d.strokeStyle = "#2563eb";
+  ctx2d.lineWidth = Math.max(2, w * 0.003);
+  ctx2d.strokeRect(rect.x, rect.y, rect.width, rect.height);
+  ctx2d.restore();
+}
+
 function drawSelectionHighlight(ctx2d, ann) {
   const bounds = getAnnotationBounds(ann);
   const pad = Math.max(4, annotationCanvas.width * 0.006);
@@ -182,6 +214,38 @@ function redraw() {
   if (movingIndex !== -1 && annotations[movingIndex]) {
     drawSelectionHighlight(actx, annotations[movingIndex]);
   }
+  const cropPreview = cropDraft || pendingCrop;
+  if (cropPreview) drawCropOverlay(actx, cropPreview);
+}
+
+// Redraws the base image from the original (untouched) Image at the current
+// cropRect, resizing both canvases to match. This is how both the initial
+// load and every applied/undone crop render — cropping never mutates
+// originalImage, just what part of it is shown.
+function renderBase() {
+  baseCanvas.width = cropRect.width;
+  baseCanvas.height = cropRect.height;
+  baseCanvas
+    .getContext("2d")
+    .drawImage(
+      originalImage,
+      cropRect.x,
+      cropRect.y,
+      cropRect.width,
+      cropRect.height,
+      0,
+      0,
+      cropRect.width,
+      cropRect.height
+    );
+  annotationCanvas.width = cropRect.width;
+  annotationCanvas.height = cropRect.height;
+  if (capturePageMeta) {
+    metaEl.textContent =
+      `${capturePageMeta.title} — ${capturePageMeta.url} — ` +
+      `${cropRect.width}×${cropRect.height}px (pixel ratio ${captureRect.devicePixelRatio})`;
+  }
+  redraw();
 }
 
 // --- Move tool: hit-testing and repositioning ---------------------------
@@ -243,9 +307,59 @@ function translateAnnotation(ann, dx, dy) {
   return { ...ann, x: ann.x + dx, y: ann.y + dy };
 }
 
+// --- Crop tool -----------------------------------------------------------
+
+// Rounded: getCanvasPoint() produces fractional coordinates (it scales by a
+// floating-point display-to-canvas ratio), and this rect ends up assigned
+// straight to canvas.width/height — a fractional value there gets silently
+// truncated by the browser, but cropRect (the JS-side record of "what's
+// currently shown") would keep the fraction, drifting out of sync with the
+// canvas's actual pixel dimensions and showing up as ugly numbers in the UI.
+function rectFromPoints(start, end) {
+  return {
+    x: Math.round(Math.min(start.x, end.x)),
+    y: Math.round(Math.min(start.y, end.y)),
+    width: Math.round(Math.abs(end.x - start.x)),
+    height: Math.round(Math.abs(end.y - start.y)),
+  };
+}
+
+function annotationOverlapsBounds(ann, width, height) {
+  const b = getAnnotationBounds(ann);
+  return b.x + b.width > 0 && b.x < width && b.y + b.height > 0 && b.y < height;
+}
+
+function updateCropButtonsVisibility() {
+  cropActionsEl.hidden = !pendingCrop;
+}
+
+// `rect` is in CURRENT-canvas-local space (same space as annotation
+// coordinates) — composing it into cropRect (which is in originalImage
+// space) is what lets nested crops and undo work without tracking a
+// separate transform chain.
+function applyCrop(rect) {
+  pushHistory();
+
+  annotations = annotations
+    .map((a) => translateAnnotation(a, -rect.x, -rect.y))
+    .filter((a) => annotationOverlapsBounds(a, rect.width, rect.height));
+
+  cropRect = {
+    x: cropRect.x + rect.x,
+    y: cropRect.y + rect.y,
+    width: rect.width,
+    height: rect.height,
+  };
+
+  renderBase();
+}
+
 // --- Tools and color ------------------------------------------------------
 
 function setTool(tool) {
+  if (pendingCrop && tool !== "crop") {
+    cancelPendingCrop();
+  }
   currentTool = tool;
   for (const btn of toolButtons) {
     btn.setAttribute("aria-pressed", String(btn.dataset.tool === tool));
@@ -341,6 +455,11 @@ function onPointerMove(e) {
     return;
   }
   if (!dragStart) return;
+  if (currentTool === "crop") {
+    cropDraft = rectFromPoints(dragStart, getCanvasPoint(e));
+    redraw();
+    return;
+  }
   draft = buildShapeDraft(dragStart, getCanvasPoint(e));
   redraw();
 }
@@ -354,6 +473,19 @@ function onPointerUp(e) {
     return;
   }
   if (!dragStart) return;
+
+  if (currentTool === "crop") {
+    const rect = rectFromPoints(dragStart, getCanvasPoint(e));
+    dragStart = null;
+    cropDraft = null;
+    if (rect.width >= MIN_CROP_SIZE && rect.height >= MIN_CROP_SIZE) {
+      pendingCrop = rect;
+      updateCropButtonsVisibility();
+    }
+    redraw();
+    return;
+  }
+
   const shape = buildShapeDraft(dragStart, getCanvasPoint(e));
   dragStart = null;
   draft = null;
@@ -459,13 +591,18 @@ function openTextInput(canvasPoint) {
 // --- Undo / clear -------------------------------------------------------
 
 function pushHistory() {
-  history.push(annotations.map((a) => ({ ...a })));
+  history.push({
+    annotations: annotations.map((a) => ({ ...a })),
+    cropRect: { ...cropRect },
+  });
 }
 
 function undo() {
   if (history.length === 0) return;
-  annotations = history.pop();
-  redraw();
+  const snapshot = history.pop();
+  annotations = snapshot.annotations;
+  cropRect = snapshot.cropRect;
+  renderBase();
 }
 
 function clearAll() {
@@ -478,15 +615,37 @@ function clearAll() {
 undoButton.addEventListener("click", undo);
 clearButton.addEventListener("click", clearAll);
 
+function cancelPendingCrop() {
+  pendingCrop = null;
+  updateCropButtonsVisibility();
+  redraw();
+}
+
+applyCropButton.addEventListener("click", () => {
+  if (!pendingCrop) return;
+  const rect = pendingCrop;
+  pendingCrop = null;
+  updateCropButtonsVisibility();
+  applyCrop(rect);
+  setTool("select");
+});
+
+cancelCropButton.addEventListener("click", cancelPendingCrop);
+
 document.addEventListener("keydown", (e) => {
   const tag = document.activeElement?.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
     e.preventDefault();
     undo();
-  } else if (e.key === "Escape" && movingIndex !== -1) {
-    e.preventDefault();
-    cancelMove();
+  } else if (e.key === "Escape") {
+    if (movingIndex !== -1) {
+      e.preventDefault();
+      cancelMove();
+    } else if (pendingCrop) {
+      e.preventDefault();
+      cancelPendingCrop();
+    }
   }
 });
 
@@ -619,19 +778,15 @@ async function init() {
   const image = new Image();
   image.onload = () => {
     const scale = rect.devicePixelRatio;
-    const sx = Math.round(rect.x * scale);
-    const sy = Math.round(rect.y * scale);
-    const sWidth = Math.round(rect.width * scale);
-    const sHeight = Math.round(rect.height * scale);
+    originalImage = image;
+    cropRect = {
+      x: Math.round(rect.x * scale),
+      y: Math.round(rect.y * scale),
+      width: Math.round(rect.width * scale),
+      height: Math.round(rect.height * scale),
+    };
 
-    baseCanvas.width = sWidth;
-    baseCanvas.height = sHeight;
-    baseCanvas.getContext("2d").drawImage(image, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
-
-    annotationCanvas.width = sWidth;
-    annotationCanvas.height = sHeight;
-
-    metaEl.textContent = `${pageMeta.title} — ${pageMeta.url} — ${sWidth}×${sHeight}px (pixel ratio ${scale})`;
+    renderBase();
     setTool("select");
   };
   image.onerror = () => showError("Could not load the captured screenshot.");

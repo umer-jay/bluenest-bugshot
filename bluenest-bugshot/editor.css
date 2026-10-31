@@ -103,6 +103,7 @@ main {
 .color-swatch:focus-visible,
 .size-group button:focus-visible,
 .action-group button:focus-visible,
+.crop-actions button:focus-visible,
 .form-actions button:focus-visible {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
@@ -117,6 +118,47 @@ main {
   font-size: 0.8rem;
   color: #6b7280;
   margin: 0 0 0.75rem;
+}
+
+.crop-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #2563eb;
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.08);
+  font-size: 0.85rem;
+}
+
+.crop-actions[hidden] {
+  display: none;
+}
+
+.crop-actions button {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+#cancel-crop-button {
+  margin-left: auto;
+  background: transparent;
+  border-color: #d1d5db;
+  color: inherit;
+}
+
+#apply-crop-button {
+  background: #2563eb;
+  color: white;
+}
+
+#apply-crop-button:hover {
+  background: #1d4ed8;
 }
 
 .canvas-wrap {

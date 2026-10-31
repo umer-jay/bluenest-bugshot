@@ -20,6 +20,9 @@
           <button type="button" class="tool-btn" data-tool="text" title="Text">T</button>
           <button type="button" class="tool-btn" data-tool="arrow" title="Arrow">↗</button>
           <button type="button" class="tool-btn" data-tool="rect" title="Rectangle">▢</button>
+          <button type="button" class="tool-btn" data-tool="crop" title="Crop — drag to select the area to keep">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.13 1L6 16a2 2 0 0 0 2 2h15"/><path d="M1 6.13L16 6a2 2 0 0 1 2 2v15"/></svg>
+          </button>
         </div>
 
         <div class="color-group" role="group" aria-label="Color">
@@ -43,7 +46,13 @@
         </div>
       </div>
 
-      <p class="hints">Shortcuts: Ctrl/Cmd+Z to undo · Enter to confirm text · Esc to cancel the current text box or an in-progress move</p>
+      <div class="crop-actions" id="crop-actions" hidden>
+        <span>Drag again to adjust, or:</span>
+        <button type="button" id="cancel-crop-button">Cancel</button>
+        <button type="button" id="apply-crop-button">Apply Crop</button>
+      </div>
+
+      <p class="hints">Shortcuts: Ctrl/Cmd+Z to undo · Enter to confirm text · Esc to cancel the current text box, an in-progress move, or a pending crop</p>
 
       <div class="canvas-wrap">
         <div class="canvas-stack" id="canvas-stack">

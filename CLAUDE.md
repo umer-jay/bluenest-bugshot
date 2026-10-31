@@ -5,11 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project status
 
 MVP complete (all 6 steps of `plan.md`) plus several post-MVP additions: a Move tool, a real undo
-history, adjustable text size, a Chrome best-practices hardening pass, and two more capture modes —
-visible-area and full-page — beyond the original region-select-only scope. Note that full-page capture
-was explicitly listed as "out of scope for MVP" in `plan.md` section 2; it's since been added anyway at
-the user's request, so treat `plan.md` as the historical starting scope, not the current feature ceiling.
-This file documents the as-built state. The extension is named **Bluenest Bugshot** (the Chrome-visible
+history, adjustable text size, an in-editor Crop tool, a Chrome best-practices hardening pass, and two
+more capture modes — visible-area and full-page — beyond the original region-select-only scope. Note
+that full-page capture was explicitly listed as "out of scope for MVP" in `plan.md` section 2; it's since
+been added anyway at the user's request, so treat `plan.md` as the historical starting scope, not the
+current feature ceiling. This file documents the as-built state. The extension is named **Bluenest Bugshot** (the Chrome-visible
 name); `plan.md` and code comments may still refer to it by its working title, "QA Screenshot to Notion."
 
 ## What this is
@@ -118,6 +118,23 @@ This diagram shows region-select (the icon click / `capture-region` shortcut). T
   Dragging itself (`hitTest()` finds the shape; `translateAnnotation()` recomputes position from the
   *original* snapshot plus total pointer delta each `pointermove`, not accumulated per-frame deltas,
   which would drift) doesn't call `pushHistory()` on every frame — only once, at drag start.
+- **History snapshots `{annotations, cropRect}` together, not just `annotations`.** This is what lets
+  Undo revert a Crop (restoring both the annotation positions *and* the previous view into the image) the
+  same way it reverts anything else — don't add a parallel undo mechanism for crop specifically.
+- **Cropping never mutates the originally-loaded image.** `originalImage` (the `Image` object from
+  `init()`) is decoded once and kept around; `cropRect` is just "what part of `originalImage`, in its
+  device-pixel space, is currently shown" — `renderBase()` redraws `baseCanvas`/`annotationCanvas` from
+  it at any time, which is both how the initial load renders and how every crop/undo re-renders. Applying
+  a new crop *composes* the dragged rect (in current-canvas-local space, i.e. the same space as
+  annotation coordinates) onto `cropRect` (which is in `originalImage` space) — `newCropRect = {x:
+  cropRect.x + rect.x, y: cropRect.y + rect.y, width: rect.width, height: rect.height}` — rather than
+  replacing it, so nested crops (crop, then crop the result again) and undo both work without tracking a
+  separate transform chain. Existing annotations are translated by `-rect.x, -rect.y` into the new crop's
+  local space at the same time; any that no longer overlap the new bounds are dropped
+  (`annotationOverlapsBounds`) rather than kept invisible forever.
+- **The crop preview dims the four strips *around* the selection, not a clear+cutout.** Clearing the
+  kept rectangle would also erase any annotations already drawn there earlier in the same `redraw()`
+  call; four separate `fillRect` strips (top/bottom/left/right of the selection) never touch those pixels.
 - **Hit-test tolerance scales with the capture's resolution** (`annotationCanvas.width * 0.01`, same
   pattern as the relative stroke widths in `drawRect`/`drawArrow`), so grabbing a thin line feels
   consistent whether the screenshot is small or large — don't hardcode a fixed pixel tolerance.

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Bluenest Bugshot",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Select a region of a page, annotate it, and send it to a Notion database as a QA card.",
   "action": {
     "default_title": "Capture QA screenshot"

@@ -91,10 +91,13 @@ You only need to do this once per Notion workspace.
      limitation: fixed headers/banners will appear duplicated at each stitch point.
 2. A new tab opens with the captured screenshot. Pick a tool — **Select** (pointer icon, pauses drawing),
    **Move** (drag an existing annotation to reposition it; Esc cancels mid-drag), **T** (text — click,
-   type, Enter to confirm), **↗** (arrow), **▢** (rectangle) — and a color, then draw on the image. Use
-   the **− / +** stepper to set the text size (10–48px) before placing a text annotation; it applies to
-   the next one you create, not to text already placed. Undo (button or Ctrl/Cmd+Z) reverts the last
-   change, whatever it was — adding a shape, moving one, or Clear; Clear wipes everything.
+   type, Enter to confirm), **↗** (arrow), **▢** (rectangle), or the **crop icon** (drag to select what
+   to keep, then click **Apply Crop** — especially useful after Capture Visible Area or Capture Full
+   Page, since those skip region selection entirely and give you the whole thing uncropped) — and a
+   color, then draw on the image. Use the **− / +** stepper to set the text size (10–48px) before
+   placing a text annotation; it applies to the next one you create, not to text already placed. Undo
+   (button or Ctrl/Cmd+Z) reverts the last change, whatever it was — adding a shape, moving one, Clear,
+   or a crop; Clear wipes everything (but doesn't undo a crop).
 3. Fill in a Title (required), Severity, and Notes.
 4. Click **Send**. It uploads the flattened screenshot and creates a card in your QA Pipeline database,
    then shows a link to open it. If you just want the image itself, **Copy Image** copies it to your
@@ -119,6 +122,10 @@ card) for errors. See `CLAUDE.md` for architecture and implementation notes.
 
 ## Changelog
 
+- **v1.3.0** — Added a Crop tool to the editor: drag to select what to keep, then Apply Crop or Cancel.
+  Fully undoable (Ctrl/Cmd+Z reverts a crop like any other change). Mainly closes a gap from v1.2.0 —
+  Capture Visible Area and Capture Full Page both skip region selection, so there was previously no way
+  to trim them down before sending.
 - **v1.2.0** — Two new capture modes, via right-click on the toolbar icon or a keyboard shortcut:
   **Capture visible area** (no selection needed) and **Capture full page** (scrolls and stitches the
   whole page into one image; very long pages are capped, and fixed headers/banners duplicate at each
