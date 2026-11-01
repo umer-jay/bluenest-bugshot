@@ -8,14 +8,35 @@
   <body>
     <main>
       <h1>Bluenest Bugshot</h1>
-      <p class="subtitle">Connect your Notion integration to start sending QA cards.</p>
+      <p class="subtitle">Connect Notion to start sending QA cards.</p>
 
-      <form id="settings-form">
+      <section class="connect-section">
+        <p id="connect-status" class="connect-status">Not connected to Notion.</p>
+        <button type="button" id="connect-button">Connect to Notion</button>
+      </section>
+
+      <details class="manual-token">
+        <summary>Advanced: use a manually pasted token or database ID instead</summary>
+        <p class="manual-token-hint">
+          Only needed if Connect to Notion isn't working, or you're using an internal integration token
+          instead of OAuth. If you're connected above, that token takes priority over anything pasted
+          here; the dropdown below takes priority over this database ID field too.
+        </p>
         <label for="token">Notion integration token</label>
         <input type="password" id="token" name="token" autocomplete="off" placeholder="secret_..." />
 
         <label for="databaseId">Database ID</label>
         <input type="text" id="databaseId" name="databaseId" autocomplete="off" placeholder="QA Pipeline database ID" />
+      </details>
+
+      <form id="settings-form">
+        <div class="database-row">
+          <label for="databaseSelect">Database</label>
+          <button type="button" id="refresh-databases-button" title="Refresh the list of databases">Refresh list</button>
+        </div>
+        <select id="databaseSelect">
+          <option value="">Connect to Notion to list databases</option>
+        </select>
 
         <label for="reporter">Reporter name</label>
         <input type="text" id="reporter" name="reporter" autocomplete="off" placeholder="Your name" />

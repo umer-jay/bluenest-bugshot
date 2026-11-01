@@ -4,8 +4,9 @@ A Chrome extension for QA testers: select a region of any web page, annotate it,
 database as a new card — screenshot included, with metadata (page URL, browser, OS, viewport, timestamp)
 filled in automatically.
 
-Internal team tool — uses a Notion internal integration token, no OAuth or backend, no Chrome Web Store
-listing. See [`plan.md`](plan.md) for the full build plan and [`CLAUDE.md`](CLAUDE.md) for architecture
+Internal team tool, no Chrome Web Store listing. Connecting to Notion is a one-click OAuth flow backed by
+a small Cloudflare Worker (see `plan.md` section 14) — most people reading this only need section 2
+below. See [`plan.md`](plan.md) for the full build plan and [`CLAUDE.md`](CLAUDE.md) for architecture
 notes if you're developing on it.
 
 ## 1. Install
@@ -18,66 +19,46 @@ notes if you're developing on it.
 5. A "Bluenest Bugshot" card should appear, with its icon in your toolbar (pin it via the puzzle-piece
    icon if you don't see it).
 
-## 2. Set up your Notion integration
+## 2. Connect to Notion
 
-You only need to do this once per Notion workspace.
-
-1. Go to `app.notion.com`, then **Settings → Developer tools → Connections** (or
-   `notion.so/my-integrations`, which redirects there).
-2. Click **"+ New connection"**.
-   - If **"API token"** is grayed out with a permission error, you're in a workspace where only admins
-     can create one. Either ask your workspace admin to create it for you, or switch to a workspace
-     where you're the owner (the workspace switcher is top-left) — click "Add a workspace" there if you
-     don't have one yet.
-3. Give it a name (the "Create connection" button stays disabled until you type one) and choose the
-   **API token** authentication method, not OAuth.
-4. Once created, make sure its capabilities include **Read content**, **Update content**, and
-   **Insert content** (Configuration tab).
-5. Copy its **API token** (the masked field with a copy icon).
-
-## 3. Set up the QA Pipeline database
-
-1. Create a database with exactly these properties (names and types matter — they must match
-   character-for-character, see `plan.md` section 6, and `notion.js`'s `NOTION_PROPERTIES`):
-
-   | Name | Type |
-   |---|---|
-   | Title | Title |
-   | Status | Status (or Select) |
-   | Severity | Select — options: Low, Medium, High, Critical |
-   | Page URL | URL |
-   | Page Title | Text |
-   | Browser | Text |
-   | OS | Text |
-   | Viewport | Text |
-   | Pixel Ratio | Number |
-   | Captured At | Date |
-   | Reporter | Text |
-   | Notes | Text |
-
-   Tip: you can ask Notion AI to build this for you — see the prompt example in this project's history,
-   or just build it by hand with "+" to add each property.
-
-   **Important:** create it as an inline table *nested inside a page* (type `/table` inside a page and
-   choose "Table - inline"), not via "+ New page" → "Table" from the sidebar directly. We hit a real
-   Notion bug where that second method can create a broken database with no usable schema — the
-   extension will show "This database has no data sources" if you run into it. If that happens, just
-   recreate it the first way.
-
-2. On that database, click **"•••"** (top-right) → **Connections** → **Connect to** → select your
-   integration from step 2. Without this, every request gets a 404 even with a valid token.
-3. Copy the database's ID: hover the table, click the expand icon (⤢) to "Open as page" if it's inline,
-   and copy the ID from the URL — the long string right before any `?v=`.
-
-## 4. Configure the extension
+This is all most people need to do.
 
 1. Right-click the extension's toolbar icon → **Options** (or **Details** → **Extension options** from
    `chrome://extensions`).
-2. Paste in your integration token and database ID, and your name under Reporter.
-3. Click **Save**, then **Test connection** — you should see "Connected to [name]. All expected
-   properties found." If it lists missing properties, fix the database schema and test again.
+2. Click **Connect to Notion**. A Notion consent screen opens — approve it, and make sure to select the
+   **QA Pipeline** database when it asks which pages/databases to share access to.
+3. Back in Settings, the **Database** dropdown should now list it — pick it, fill in your name under
+   **Reporter**, and click **Save**.
+4. Click **Test connection** — you should see "Connected to 'QA Pipeline'. All expected properties
+   found."
 
-## 5. Use it
+If the dropdown says "No databases shared with this connection yet," click **Refresh list** after making
+sure you shared QA Pipeline during the consent screen (or share it afterward in Notion: that database's
+**"•••"** menu → **Connections** → **Connect to** → find this app's connection).
+
+## 3. Admin setup (already done — one-time, not per-teammate)
+
+Skip this unless you're setting this up for the team for the first time, or something's broken. Full
+detail in `plan.md` section 14 and `worker/README.md`.
+
+- A public Notion integration (OAuth, not internal) was registered once, with its redirect URI pinned to
+  this extension's fixed ID (`manifest.json`'s `"key"` field makes that ID identical for every install,
+  regardless of where someone unzips the extension).
+- A Cloudflare Worker (`worker/`) holds the OAuth client secret and each install's token pair — the
+  extension never sees the client secret, only short-lived access tokens.
+- The **QA Pipeline** database (schema in `plan.md` section 6) was created once, as an inline table
+  nested inside a page — not via "+ New page" → "Table" from the sidebar, which can produce a broken
+  database with no usable schema (a real Notion bug we hit while building this).
+
+### Fallback: manual internal integration token
+
+If OAuth isn't an option (Worker is down, or you'd rather not depend on it), Settings has an "Advanced"
+section for pasting a Notion **internal** integration token and database ID by hand instead — the
+original pre-OAuth setup. That path still works but requires creating your own internal integration in
+Notion and manually sharing the database with it; see the git history of this README (any commit before
+the "Team OAuth" one) for the full walkthrough of that flow.
+
+## 4. Use it
 
 1. Pick a capture mode, on any normal web page (not a `chrome://` page or the Chrome Web Store — those
    can't be captured):
@@ -109,12 +90,19 @@ You only need to do this once per Notion workspace.
 
 - **Nothing happens when I click the icon on some pages** — Chrome blocks extensions from capturing its
   own internal pages (`chrome://...`) and the Web Store; you'll get a system notification saying so.
-- **"Invalid Notion token"** — re-check the token in Settings; it may have been copied with extra
-  whitespace, or the connection was deleted in Notion.
-- **"Database not found" / 404** — the database isn't shared with your connection yet (step 3.2 above).
+- **Database dropdown is empty or says "No databases shared with this connection yet"** — you didn't
+  share the QA Pipeline database during the Notion consent screen. Click **Refresh list**, or share it
+  explicitly in Notion first: that database's **"•••"** menu → **Connections** → **Connect to**.
+- **"Not connected to Notion. Connect it in Settings first."** — click **Connect to Notion** in Settings;
+  this shows if neither an OAuth connection nor a manually pasted token is set up.
+- **"Invalid Notion token"** (only relevant if using the manual fallback token) — re-check it in the
+  Advanced section; it may have extra whitespace, or the integration was deleted in Notion.
+- **"Database not found" / 404** — the database isn't shared with your connection.
 - **"This database has no data sources"** — the database was likely created as a top-level page instead
-  of an inline table — see the note in step 3.1.
-- **A property is reported missing** — the name in Notion doesn't match the table in step 3.1 exactly.
+  of an inline table — see the admin setup note above.
+- **A property is reported missing** — the name in Notion doesn't match `plan.md` section 6 exactly.
+- **Connect to Notion fails or hangs** — the Worker may be down, or the redirect URI mismatched; this is
+  admin-level debugging, see `plan.md` section 14 and `worker/README.md`.
 
 ## Development
 
@@ -124,6 +112,13 @@ card) for errors. See `CLAUDE.md` for architecture and implementation notes.
 
 ## Changelog
 
+- **v1.5.0** — Team OAuth: Settings now has a "Connect to Notion" button backed by a Cloudflare Worker
+  (`worker/`), replacing the need for each teammate to create their own Notion integration and copy a
+  token by hand. Also added a database picker (dropdown, built on Notion's search API) so the database ID
+  doesn't need to be copied manually either — pick it from a list of whatever your connection can see.
+  The old manual-token path still works as an Advanced fallback. See `plan.md` section 14 for the full
+  architecture and the tradeoffs accepted (this is the project's first backend, and OAuth tokens expire
+  and need periodic refresh, unlike the internal token this replaces for most people).
 - **v1.4.0** — Added a Blur tool: drag over something sensitive (an email, account ID, etc.) to pixelate
   it. Implemented as real pixelation, not a soft blur — a well-known weak form of redaction that can
   sometimes be partially reversed — so it actually destroys the underlying detail. Works with Move,

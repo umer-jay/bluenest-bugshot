@@ -87,9 +87,19 @@ async function readErrorMessage(response, notFoundMessage) {
   return body.message || `Notion API error (${response.status}).`;
 }
 
+// Tags the thrown Error with the HTTP status so callers can tell "token
+// expired" (401) apart from any other failure without string-matching the
+// message — specifically so oauth.js can retry once after a refresh on a
+// 401 without needing to retry on, say, a 404 or a validation error.
+async function throwNotionError(response, notFoundMessage) {
+  const err = new Error(await readErrorMessage(response, notFoundMessage));
+  err.notionStatus = response.status;
+  throw err;
+}
+
 async function notionGet(token, url, notFoundMessage) {
   const response = await requestWithRetry(url, { method: "GET", headers: baseHeaders(token) });
-  if (!response.ok) throw new Error(await readErrorMessage(response, notFoundMessage));
+  if (!response.ok) await throwNotionError(response, notFoundMessage);
   return response.json();
 }
 
@@ -99,7 +109,7 @@ async function notionPostJson(token, url, payload, notFoundMessage) {
     headers: { ...baseHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!response.ok) throw new Error(await readErrorMessage(response, notFoundMessage));
+  if (!response.ok) await throwNotionError(response, notFoundMessage);
   return response.json();
 }
 
@@ -111,7 +121,7 @@ async function notionPostForm(token, url, formData) {
     headers: baseHeaders(token),
     body: formData,
   });
-  if (!response.ok) throw new Error(await readErrorMessage(response));
+  if (!response.ok) await throwNotionError(response);
   return response.json();
 }
 
@@ -162,6 +172,27 @@ function missingPropertyNames(schemaProperties) {
 export async function testConnection({ token, databaseId }) {
   const { title, dataSourceId, properties } = await resolveDatabase(token, databaseId);
   return { title, dataSourceId, missingProperties: missingPropertyNames(properties) };
+}
+
+// Lists every database this token's connection can see, for the Settings
+// page's "pick a database" dropdown (an alternative to copying a database ID
+// by hand). Notion's search filter only supports "page" or "data_source" as
+// object types under the current API version — there's no "database" filter
+// value — so this searches data sources and reads each result's
+// parent.database_id, which is the same kind of ID testConnection/sendCapture
+// already expect from the manual "Database ID" field.
+export async function searchAccessibleDatabases(token) {
+  const response = await notionPostJson(token, "https://api.notion.com/v1/search", {
+    filter: { property: "object", value: "data_source" },
+    page_size: 100,
+  });
+
+  return (response.results || [])
+    .filter((result) => result.parent?.type === "database_id")
+    .map((result) => ({
+      databaseId: result.parent.database_id,
+      title: (result.title || []).map((t) => t.plain_text).join("") || "(untitled)",
+    }));
 }
 
 // --- Sending a capture ------------------------------------------------

@@ -1,2 +1,6 @@
 .DS_Store
 *.log
+secrets/
+*.pem
+.dev.vars
+worker/.wrangler/

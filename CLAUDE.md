@@ -7,11 +7,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 MVP complete (all 6 steps of `plan.md`) plus several post-MVP additions: a Move tool, a real undo
 history, adjustable text size, an in-editor Crop tool, a Blur (pixelate) tool, a Chrome best-practices
 hardening pass, and two more capture modes — visible-area and full-page — beyond the original
-region-select-only scope. Note
-that full-page capture was explicitly listed as "out of scope for MVP" in `plan.md` section 2; it's since
-been added anyway at the user's request, so treat `plan.md` as the historical starting scope, not the
-current feature ceiling. This file documents the as-built state. The extension is named **Bluenest Bugshot** (the Chrome-visible
-name); `plan.md` and code comments may still refer to it by its working title, "QA Screenshot to Notion."
+region-select-only scope. Note that full-page capture was explicitly listed as "out of scope for MVP" in
+`plan.md` section 2; it's since been added anyway at the user's request, so treat `plan.md` as the
+historical starting scope, not the current feature ceiling. This file documents the as-built state.
+
+**Active work in progress: Team OAuth, see `plan.md` section 14.** Replacing the manual
+internal-integration-token Settings flow with per-teammate Notion OAuth via a Cloudflare Worker backend
+(`worker/`, deployed at the URL hardcoded in `oauth.js`'s `WORKER_BASE_URL`). This is the first time this
+project has had any backend — previously a deliberate non-goal ("no backend needed," `plan.md` section
+3). Settings also now has a database picker (dropdown, built on Notion's search API) instead of requiring
+the database ID to be copied by hand — see the end of `plan.md` section 14. Read section 14 before
+touching Settings/`notion.js`/`background.js`/`oauth.js` auth-related code while this is in flight, since
+it changes where the Notion token and database ID come from without changing how `notion.js` itself calls
+the Notion API. Status: built, Worker deployed and responding, OAuth consent flow reaches Settings
+successfully; end-to-end testing (send a real capture via an OAuth-sourced token) not yet confirmed.
+
+The extension is named **Bluenest Bugshot** (the Chrome-visible name); `plan.md` and code comments may
+still refer to it by its working title, "QA Screenshot to Notion."
 
 ## What this is
 

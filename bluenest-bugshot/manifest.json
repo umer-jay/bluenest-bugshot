@@ -1,7 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Bluenest Bugshot",
-  "version": "1.4.0",
+  "version": "1.5.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6KtYfTQET9pJa4vxR6XfUAPAgv37oudg4kUCvH3zZRVVEJmfvRfUuaS/QPoMThfLxS1Q3vJli1I15sRTiZfVqdUU4fhi90H5Qd8NSG0IDx3hTb7uSLXF5x3LWO6FTNqJhVsTz5B4HAH5el2GlesJr4cr/dnvsKnuz2xqyk54S4o1VJ9cuj+TuloLZjzyGzzI4NVoStKza1mB2N978Z/dQ22rwSVyIzQ3aC78kTxZ+N/7OeHPo8fIdPPG1lA5XFVsQ3n1epd3EjxUO3rjHluU2mA8cuVmbsulSdw/x1s9U8igOzCM4+sijBuYfstlOT5JHFFVB3GDxO3B47JuxfXlGQIDAQAB",
   "description": "Select a region of a page, annotate it, and send it to a Notion database as a QA card.",
   "action": {
     "default_title": "Capture QA screenshot"
@@ -42,8 +43,11 @@
     "page": "options.html",
     "open_in_tab": true
   },
-  "permissions": ["activeTab", "storage", "scripting", "notifications", "contextMenus"],
-  "host_permissions": ["https://api.notion.com/*"],
+  "permissions": ["activeTab", "storage", "scripting", "notifications", "contextMenus", "identity"],
+  "host_permissions": [
+    "https://api.notion.com/*",
+    "https://bluenest-bugshot-oauth.umer-626.workers.dev/*"
+  ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   }

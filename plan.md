@@ -282,7 +282,7 @@ Estimate assumes one developer using an AI coding tool. Step 4 (annotation) and 
 - Capture console errors and network failures as extra metadata
 
 **Customer version**
-- Notion OAuth with a small backend to hold the client secret
+- Notion OAuth with a small backend to hold the client secret — see section 14, now active work, not deferred
 - Duplicable QA database template and field mapping
 - Privacy policy, support page, and onboarding flow
 - Chrome Web Store listing and review
@@ -294,3 +294,94 @@ Estimate assumes one developer using an AI coding tool. Step 4 (annotation) and 
 - Screenshot, annotations, and metadata all arrive correctly.
 - Errors are understandable and never lose the tester's work.
 - At least three teammates have used it on real QA work without help.
+
+## 14. Team OAuth (Cloudflare Workers)
+
+Replaces the manual "create your own Notion integration, copy the token into Settings" setup (section
+2/README) with per-teammate OAuth — each person authorizes with their own Notion login instead of
+handling a shared secret. Decided and in progress, not a deferred idea; owner: the person who built this
+(single point of contact for the Cloudflare account, the Notion public integration, and anything that
+breaks).
+
+**Why this over staying with a shared or per-person internal integration token**
+- No static secret living in distributed extension files, Slack messages, or a password manager entry
+  someone has to pass around.
+- Each teammate's own Notion login is what authorizes — a step toward per-person attribution instead of
+  a shared bot identity, even though the Notion card itself still only records the `Reporter` text field
+  as before.
+- Knowingly accepted tradeoff: Notion OAuth access tokens expire (lifetime undocumented by Notion) and
+  refresh tokens rotate on every use, capped at 180 days absolute or 30 days of inactivity — whichever
+  comes first. This is not "connect once, forever"; a teammate who stops using the extension for a month
+  or more may need to re-authorize. Still strictly better than a shared secret that never expires but can
+  leak silently.
+
+**What stays manual no matter what (Notion has no API to automate these)**
+1. Registering a *public* Notion integration (not internal) in Notion's developer portal, to get a
+   `client_id`/`client_secret` and set an OAuth redirect URI. A human has to do this once, logged into
+   the Notion account that should own the integration.
+2. Creating the Cloudflare account, authenticating `wrangler`, and creating a KV namespace for token
+   storage. Also a one-time setup step, done once by whoever owns this.
+
+**What this removes for everyone else on the team**
+- No more teammates creating their own internal integration, hitting the "you don't have permission to
+  create internal connections" workspace wall (see the note on this in `CLAUDE.md`), or copying a token
+  into Settings by hand.
+- Notion's own OAuth consent screen lets the authorizing user pick which pages/databases to grant access
+  to as part of approving the connection — expected to fold the separate "share this database with your
+  integration" step (section 3) into that single consent screen, rather than requiring it as a second
+  manual step afterward. Confirm this during live testing rather than assuming it; Notion's docs weren't
+  explicit on this point.
+
+**Architecture**
+
+```
+Extension (background.js / new oauth.js)
+   - chrome.identity.launchWebAuthFlow() opens Notion's OAuth consent screen
+   - redirect_uri is this extension's own chrome.identity.getRedirectURL()
+     (https://<extension-id>.chromiumapp.org/) — must be registered exactly
+     in the Notion integration's settings
+   - gets back an authorization `code`
+        |
+Cloudflare Worker (new, worker/ in this repo)
+   - POST /exchange  {code, installId}
+       trades the code for {access_token, refresh_token} using the Notion
+       client secret (which never exists in the extension) and stores it
+       in Workers KV, keyed by installId
+   - GET  /token?installId=...
+       returns whatever access_token is currently stored — no proactive
+       expiry guessing, since Notion doesn't return an expires_in
+   - POST /refresh  {installId}
+       uses the stored refresh_token to get a new access_token +
+       refresh_token pair from Notion (the old refresh_token is retired by
+       Notion on every rotation; the Worker must persist the new one or the
+       chain breaks) and updates KV
+        |
+notion.js (unchanged)
+   - still just calls api.notion.com with whatever access_token it's
+     handed; doesn't know or care whether it came from a pasted internal
+     integration secret or from OAuth
+```
+
+`installId` is a random UUID generated once per extension install (`crypto.randomUUID()`), stored in
+`chrome.storage.local` — the only thing tying a browser install to its KV record. There's no separate
+login system and the Worker never learns who the human is, only this opaque ID.
+
+**Refresh strategy**: reactive, not proactive. The extension asks `/token` for whatever's currently
+stored; if a subsequent Notion API call comes back 401, the extension calls `/refresh` once and retries.
+Guessing an expiry timer isn't possible since Notion doesn't document the access token's lifetime.
+
+**Manifest changes required**
+- New permission: `identity` (for `chrome.identity.launchWebAuthFlow`).
+- A host permission (or equivalent awareness) for the Worker's own domain
+  (`https://<worker-name>.<account>.workers.dev/*`), since the extension calls it directly.
+
+**Secrets**: `NOTION_CLIENT_ID` / `NOTION_CLIENT_SECRET` are Wrangler secrets on the Worker, never
+committed to this repo, never present in the extension.
+
+**Database picker (built on top of OAuth)**: once connected, Settings shows a dropdown listing every
+database the connection can see, instead of requiring the database ID to be copied by hand. Built via
+Notion's search endpoint filtered to `data_source` objects (the current API version has no "database"
+filter value) — each result's `parent.database_id` is the same kind of ID `testConnection`/`sendCapture`
+already expect, so this required no changes to how those functions resolve a database, only a new way to
+*pick* one. The manual "Database ID" field still exists as an Advanced fallback (e.g. for the
+internal-token path, which has no OAuth connection to search with).

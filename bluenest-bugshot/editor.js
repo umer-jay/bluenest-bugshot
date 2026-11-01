@@ -1,4 +1,5 @@
 import { sendCapture } from "./notion.js";
+import { withNotionToken } from "./oauth.js";
 
 const MAX_EXPORT_WIDTH = 1600;
 const EXPORT_QUALITY = 0.85;
@@ -724,15 +725,14 @@ detailsForm.addEventListener("submit", async (e) => {
   cancelButton.disabled = true;
 
   try {
-    const { notionToken, notionDatabaseId, reporterName } = await chrome.storage.local.get([
-      "notionToken",
+    const { notionDatabaseId, reporterName } = await chrome.storage.local.get([
       "notionDatabaseId",
       "reporterName",
     ]);
 
-    if (!notionToken || !notionDatabaseId) {
+    if (!notionDatabaseId) {
       throw new Error(
-        "Set up your Notion token and database ID in Settings first (right-click the extension icon → Options)."
+        "Set up your Notion database ID in Settings first (right-click the extension icon → Options)."
       );
     }
 
@@ -740,17 +740,19 @@ detailsForm.addEventListener("submit", async (e) => {
     const { blob } = await exportFlattenedImage();
 
     setStatus("Uploading to Notion…");
-    const { pageUrl } = await sendCapture({
-      token: notionToken,
-      databaseId: notionDatabaseId,
-      blob,
-      title: titleInput.value.trim(),
-      severity: severitySelect.value,
-      notes: notesTextarea.value.trim(),
-      reporter: reporterName || "",
-      pageMeta: capturePageMeta,
-      devicePixelRatio: captureRect.devicePixelRatio,
-    });
+    const { pageUrl } = await withNotionToken((token) =>
+      sendCapture({
+        token,
+        databaseId: notionDatabaseId,
+        blob,
+        title: titleInput.value.trim(),
+        severity: severitySelect.value,
+        notes: notesTextarea.value.trim(),
+        reporter: reporterName || "",
+        pageMeta: capturePageMeta,
+        devicePixelRatio: captureRect.devicePixelRatio,
+      })
+    );
 
     await chrome.storage.local.set({ lastSeverity: severitySelect.value });
 
