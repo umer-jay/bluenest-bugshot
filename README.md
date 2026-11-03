@@ -32,6 +32,12 @@ This is all most people need to do.
 4. Click **Test connection** — you should see "Connected to 'QA Pipeline'. All expected properties
    found."
 
+**No QA database yet?** Under the Database dropdown, open **"Don't have a QA database yet? Create
+one"**, pick a Notion page to create it in, and click **Create database**. It comes with every column
+Bugshot needs (plus an Assignee column) and is selected and saved automatically. The page list only
+shows pages you shared during the Notion consent screen. If it's empty, click **Reconnect** and share a
+page too.
+
 If the dropdown says "No databases shared with this connection yet," click **Refresh list** after making
 sure you shared QA Pipeline during the consent screen (or share it afterward in Notion: that database's
 **"•••"** menu → **Connections** → **Connect to** → find this app's connection).
@@ -112,6 +118,11 @@ card) for errors. See `CLAUDE.md` for architecture and implementation notes.
 
 ## Changelog
 
+- **v1.6.0** — Create the QA database straight from Settings: open "Don't have a QA database yet?
+  Create one", pick a Notion page to put it in, and Bugshot creates a database with every column it
+  needs and selects it. No more building the schema by hand in Notion. Databases created this way also
+  get an **Assignee** (Person) column, assigned in Notion. It's optional, so existing databases without
+  it keep working.
 - **v1.5.0** — Team OAuth: Settings now has a "Connect to Notion" button backed by a Cloudflare Worker
   (`worker/`), replacing the need for each teammate to create their own Notion integration and copy a
   token by hand. Also added a database picker (dropdown, built on Notion's search API) so the database ID

@@ -16,7 +16,8 @@ internal-integration-token Settings flow with per-teammate Notion OAuth via a Cl
 (`worker/`, deployed at the URL hardcoded in `oauth.js`'s `WORKER_BASE_URL`). This is the first time this
 project has had any backend — previously a deliberate non-goal ("no backend needed," `plan.md` section
 3). Settings also now has a database picker (dropdown, built on Notion's search API) instead of requiring
-the database ID to be copied by hand — see the end of `plan.md` section 14. Read section 14 before
+the database ID to be copied by hand. Since v1.6.0, it can also create a correctly-shaped QA database
+inside a chosen Notion page. Both are described at the end of `plan.md` section 14. Read section 14 before
 touching Settings/`notion.js`/`background.js`/`oauth.js` auth-related code while this is in flight, since
 it changes where the Notion token and database ID come from without changing how `notion.js` itself calls
 the Notion API. Status: built, Worker deployed and responding, OAuth consent flow reaches Settings
@@ -176,7 +177,11 @@ This diagram shows region-select (the icon click / `capture-region` shortcut). T
   all and a caught exception alone isn't a "friendly" user-facing message.
 - **Notion property names are centralized.** Keep all Notion database property names/types in one config
   object in `notion.js` (see schema in `plan.md` section 6) so a rename in Notion only requires one
-  code change.
+  code change. `NOTION_PROPERTIES` holds the *required* columns, checked before every send.
+  `OPTIONAL_NOTION_PROPERTIES` (currently just `Assignee`) holds columns that only
+  `buildQaDatabaseSchema()` adds when Settings creates a database. Sending neither requires nor fills
+  them. Don't move an optional column into `NOTION_PROPERTIES` without a migration story: every existing
+  database that lacks it would start refusing to send.
 - **Token handling.** The Notion integration token lives only in `chrome.storage.local`, set via
   `options.html`. Never hardcode it, never commit it, mask it in the settings UI.
 - **Permissions stay minimal.** `activeTab`, `storage`, `scripting`, `notifications`, `contextMenus`, plus
@@ -184,7 +189,9 @@ This diagram shows region-select (the icon click / `capture-region` shortcut). T
   exception to avoiding host permissions). `notifications` was added in Step 3, beyond `plan.md` section
   3's original list, specifically so `background.js` can show a toast for "can't capture this page" — a
   page a content script can't be injected into also can't display an in-page error. `contextMenus` was
-  added for the visible-area/full-page capture modes' right-click trigger. Don't add further permissions
+  added for the visible-area/full-page capture modes' right-click trigger. `identity` (for
+  `chrome.identity.launchWebAuthFlow`) and the Worker's host permission were added for Team OAuth
+  (`plan.md` section 14). Don't add further permissions
   without a similarly concrete reason.
 - **`content.js` is a classic (non-module) script re-injected via `chrome.scripting.executeScript` on every
   trigger**, not loaded once. Its whole body must stay wrapped in an IIFE (top-level `let`/`const` would

@@ -109,6 +109,7 @@ Create a database called **QA Pipeline** and share it with your integration. Sug
 | Captured At | Date | Auto |
 | Reporter | Text | Settings or tester |
 | Notes | Text | Tester |
+| Assignee | Person | Set in Notion. Optional, only added to databases created from Settings (v1.6.0) |
 
 The screenshot goes into the page body as an image block.
 
@@ -385,3 +386,12 @@ filter value) — each result's `parent.database_id` is the same kind of ID `tes
 already expect, so this required no changes to how those functions resolve a database, only a new way to
 *pick* one. The manual "Database ID" field still exists as an Advanced fallback (e.g. for the
 internal-token path, which has no OAuth connection to search with).
+
+**Create database from Settings (v1.6.0)**: a "Create one" panel under the dropdown lists the pages the
+connection can see (search filtered to `page`, minus database rows), then calls `POST /v1/databases`.
+The schema goes under `initial_data_source.properties`, as the data-source model requires. The database
+is created inline inside the chosen page (`is_inline: true`), not at the workspace level, because a
+top-level database is the form that has come back with an empty `data_sources` array. The schema is
+generated from `NOTION_PROPERTIES` (`buildQaDatabaseSchema()` in `notion.js`). Status is created as a
+Select, since a new Status-type column only gets Notion's default options, which don't include "New".
+The new database is saved as the active one right away and verified with `testConnection`.
