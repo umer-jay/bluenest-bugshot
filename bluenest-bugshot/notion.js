@@ -21,6 +21,64 @@ export const NOTION_PROPERTIES = {
   notes: "Notes",
 };
 
+// Columns that databases created from Settings get, but that sending doesn't
+// require or fill in. They're kept out of NOTION_PROPERTIES on purpose: that
+// list is checked before every send (missingPropertyNames), so adding them
+// there would break every existing database that lacks these columns.
+export const OPTIONAL_NOTION_PROPERTIES = {
+  assignee: "Assignee",
+};
+
+// Status value every new card is created with. Also the first option of the
+// Status column in databases created via createQaDatabase(), so the two can't
+// drift apart.
+const DEFAULT_STATUS = "New";
+
+// Property types for a database created from Settings ("Create one").
+// Built from NOTION_PROPERTIES so a rename there carries over automatically.
+// Status is a Select, not a Status-type column: a new Status column can only
+// start with Notion's own default groups/options, which don't include "New".
+// buildPropertyValue handles either type, so existing databases with a real
+// Status column keep working.
+function buildQaDatabaseSchema() {
+  const P = NOTION_PROPERTIES;
+  return {
+    [P.title]: { title: {} },
+    [P.status]: {
+      select: {
+        options: [
+          { name: DEFAULT_STATUS, color: "blue" },
+          { name: "In Progress", color: "yellow" },
+          { name: "Done", color: "green" },
+          { name: "Won't Fix", color: "gray" },
+        ],
+      },
+    },
+    [P.severity]: {
+      select: {
+        options: [
+          { name: "Low", color: "gray" },
+          { name: "Medium", color: "yellow" },
+          { name: "High", color: "orange" },
+          { name: "Critical", color: "red" },
+        ],
+      },
+    },
+    [P.pageUrl]: { url: {} },
+    [P.pageTitle]: { rich_text: {} },
+    [P.browser]: { rich_text: {} },
+    [P.os]: { rich_text: {} },
+    [P.viewport]: { rich_text: {} },
+    [P.pixelRatio]: { number: { format: "number" } },
+    [P.capturedAt]: { date: {} },
+    [P.reporter]: { rich_text: {} },
+    [P.notes]: { rich_text: {} },
+    // People-type, so it holds real workspace members and Notion can notify
+    // them. Assigned in Notion for now; the editor doesn't set it.
+    [OPTIONAL_NOTION_PROPERTIES.assignee]: { people: {} },
+  };
+}
+
 function baseHeaders(token) {
   return {
     Authorization: `Bearer ${token}`,
@@ -195,6 +253,49 @@ export async function searchAccessibleDatabases(token) {
     }));
 }
 
+function extractPageTitle(page) {
+  const titleProperty = Object.values(page.properties || {}).find((p) => p.type === "title");
+  return (titleProperty?.title || []).map((t) => t.plain_text).join("") || "(untitled)";
+}
+
+// Lists regular pages this connection can see, to use as the parent for
+// createQaDatabase(). Rows of a database are pages too, so those are filtered
+// out: creating the QA database inside a row of some other database would
+// just be confusing.
+export async function searchAccessiblePages(token) {
+  const response = await notionPostJson(token, "https://api.notion.com/v1/search", {
+    filter: { property: "object", value: "page" },
+    sort: { direction: "descending", timestamp: "last_edited_time" },
+    page_size: 100,
+  });
+
+  return (response.results || [])
+    .filter((page) => page.parent?.type !== "database_id" && page.parent?.type !== "data_source_id")
+    .map((page) => ({ pageId: page.id, title: extractPageTitle(page) }));
+}
+
+// Creates a database with the full schema Bugshot expects (see
+// buildQaDatabaseSchema) inside `parentPageId`. It's created as an inline
+// table inside a page, not as a top-level database. Top-level databases have
+// come back from the API with an empty data_sources array (see the
+// "no data sources" note in README troubleshooting), and the inline form is
+// the known-good one. Returns the new database's ID, the same kind of ID the
+// dropdown and the manual "Database ID" field store.
+export async function createQaDatabase({ token, parentPageId, title }) {
+  const database = await notionPostJson(
+    token,
+    "https://api.notion.com/v1/databases",
+    {
+      parent: { type: "page_id", page_id: parentPageId },
+      title: [{ type: "text", text: { content: title } }],
+      is_inline: true,
+      initial_data_source: { properties: buildQaDatabaseSchema() },
+    },
+    "Parent page not found. Make sure it's shared with this connection."
+  );
+  return { databaseId: database.id, title, url: database.url };
+}
+
 // --- Sending a capture ------------------------------------------------
 
 function buildPropertyValue(type, rawValue) {
@@ -282,7 +383,7 @@ export async function sendCapture({
 
   const fieldValues = {
     title,
-    status: "New",
+    status: DEFAULT_STATUS,
     severity,
     pageUrl: pageMeta.url,
     pageTitle: pageMeta.title,

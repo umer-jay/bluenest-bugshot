@@ -38,6 +38,21 @@
           <option value="">Connect to Notion to list databases</option>
         </select>
 
+        <details class="create-database" id="create-database">
+          <summary>Don't have a QA database yet? Create one</summary>
+          <p class="create-database-hint">
+            Creates a new database with every property Bugshot needs, inside a Notion page this
+            connection can access, and selects it for you.
+          </p>
+          <label for="parentPageSelect">Create inside page</label>
+          <select id="parentPageSelect">
+            <option value="">Loading pages…</option>
+          </select>
+          <label for="newDatabaseTitle">Database name</label>
+          <input type="text" id="newDatabaseTitle" autocomplete="off" value="QA Pipeline" />
+          <button type="button" id="create-database-button">Create database</button>
+        </details>
+
         <label for="reporter">Reporter name</label>
         <input type="text" id="reporter" name="reporter" autocomplete="off" placeholder="Your name" />
 

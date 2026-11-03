@@ -140,6 +140,40 @@ select:focus-visible {
   cursor: default;
 }
 
+.create-database {
+  margin-top: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.create-database summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.create-database-hint {
+  color: #6b7280;
+  margin: 0.5rem 0 0;
+}
+
+.create-database label {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+#create-database-button {
+  margin-top: 0.75rem;
+  background: #2563eb;
+  color: white;
+}
+
+#create-database-button:hover {
+  background: #1d4ed8;
+}
+
 .actions {
   display: flex;
   gap: 0.6rem;
